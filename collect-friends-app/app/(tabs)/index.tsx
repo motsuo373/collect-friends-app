@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet,
   View,
   TouchableOpacity,
   Alert,
@@ -14,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusModal, UserStatus } from '@/components/StatusModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import tw from 'twrnc';
 
 // Platform別のインポート
 let MapView: any = null;
@@ -190,25 +190,25 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.loadingContainer}>
+      <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100`}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <ThemedText style={styles.loadingText}>位置情報を取得中...</ThemedText>
+        <ThemedText style={tw`mt-4 text-base text-gray-600`}>位置情報を取得中...</ThemedText>
       </ThemedView>
     );
   }
 
   if (!locationPermissionGranted) {
     return (
-      <ThemedView style={styles.errorContainer}>
+      <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100 px-10`}>
         <Ionicons name="location-outline" size={64} color="#ccc" />
-        <ThemedText type="title" style={styles.errorTitle}>
+        <ThemedText type="title" style={tw`mt-5 mb-3 text-center`}>
           位置情報が必要です
         </ThemedText>
-        <ThemedText style={styles.errorText}>
+        <ThemedText style={tw`text-center text-gray-600 leading-6 mb-8`}>
           近くの友達を見つけるために{'\n'}位置情報の使用を許可してください
         </ThemedText>
-        <TouchableOpacity style={styles.retryButton} onPress={requestLocationPermission}>
-          <Text style={styles.retryButtonText}>再試行</Text>
+        <TouchableOpacity style={tw`bg-blue-500 px-8 py-3 rounded-full`} onPress={requestLocationPermission}>
+          <Text style={tw`text-white text-base font-semibold`}>再試行</Text>
         </TouchableOpacity>
       </ThemedView>
     );
@@ -217,58 +217,58 @@ export default function HomeScreen() {
   // Web用の代替画面
   if (Platform.OS === 'web') {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView style={tw`flex-1`}>
         {/* ヘッダー */}
-        <View style={styles.webHeader}>
+        <View style={tw`p-5 pt-15 bg-blue-500 items-center`}>
           <ThemedText type="title">Correct Friends</ThemedText>
-          <ThemedText style={styles.webSubtitle}>
+          <ThemedText style={tw`text-white text-sm mt-2 opacity-90`}>
             {userLocation ? `現在地: ${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}` : '位置情報取得中...'}
           </ThemedText>
         </View>
 
         {/* ステータス表示カード */}
-        <View style={styles.webStatusCard}>
-          <View style={styles.webStatusHeader}>
+        <View style={tw`m-5 bg-white rounded-2xl p-5 shadow-sm`}>
+          <View style={tw`flex-row items-center mb-4`}>
             <View style={[
-              styles.webStatusIndicator,
+              tw`w-4 h-4 rounded-full mr-3`,
               { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
             ]} />
             <ThemedText type="subtitle">あなたの現在のステータス</ThemedText>
           </View>
           
-          <View style={styles.webStatusContent}>
-            <ThemedText style={styles.webStatusText}>{getStatusText()}</ThemedText>
+          <View style={tw`mb-4`}>
+            <ThemedText style={tw`text-lg font-semibold mb-2`}>{getStatusText()}</ThemedText>
             {userStatus.isAvailable && (
-              <ThemedText style={styles.webRangeText}>移動範囲: {getMoveRangeText()}</ThemedText>
+              <ThemedText style={tw`text-sm text-gray-600`}>移動範囲: {getMoveRangeText()}</ThemedText>
             )}
           </View>
 
           <TouchableOpacity
-            style={styles.webStatusButton}
+            style={tw`flex-row items-center justify-center bg-gray-100 p-3 rounded-xl`}
             onPress={() => setStatusModalVisible(true)}
           >
             <Ionicons name="create-outline" size={20} color="#007AFF" />
-            <Text style={styles.webStatusButtonText}>ステータスを変更</Text>
+            <Text style={tw`ml-2 text-base text-blue-500 font-medium`}>ステータスを変更</Text>
           </TouchableOpacity>
         </View>
 
         {/* 位置情報カード */}
         {userLocation && (
-          <View style={styles.webLocationCard}>
+          <View style={tw`mx-5 mt-0 bg-white rounded-2xl p-5 shadow-sm`}>
             <ThemedText type="subtitle">現在地情報</ThemedText>
-            <View style={styles.webLocationInfo}>
-              <View style={styles.webLocationItem}>
+            <View style={tw`mt-4`}>
+              <View style={tw`flex-row items-center mb-3`}>
                 <Ionicons name="location" size={20} color="#007AFF" />
-                <View style={styles.webLocationText}>
-                  <ThemedText style={styles.webLocationLabel}>緯度</ThemedText>
-                  <ThemedText style={styles.webLocationValue}>{userLocation.latitude.toFixed(6)}</ThemedText>
+                <View style={tw`ml-3 flex-1`}>
+                  <ThemedText style={tw`text-xs text-gray-600 mb-1`}>緯度</ThemedText>
+                  <ThemedText style={tw`text-base font-medium`}>{userLocation.latitude.toFixed(6)}</ThemedText>
                 </View>
               </View>
-              <View style={styles.webLocationItem}>
+              <View style={tw`flex-row items-center mb-3`}>
                 <Ionicons name="location" size={20} color="#007AFF" />
-                <View style={styles.webLocationText}>
-                  <ThemedText style={styles.webLocationLabel}>経度</ThemedText>
-                  <ThemedText style={styles.webLocationValue}>{userLocation.longitude.toFixed(6)}</ThemedText>
+                <View style={tw`ml-3 flex-1`}>
+                  <ThemedText style={tw`text-xs text-gray-600 mb-1`}>経度</ThemedText>
+                  <ThemedText style={tw`text-base font-medium`}>{userLocation.longitude.toFixed(6)}</ThemedText>
                 </View>
               </View>
             </View>
@@ -276,9 +276,9 @@ export default function HomeScreen() {
         )}
 
         {/* Web用注意事項 */}
-        <View style={styles.webNotice}>
+        <View style={tw`mx-5 mt-0 p-4 bg-yellow-50 rounded-xl flex-row items-start`}>
           <Ionicons name="information-circle-outline" size={24} color="#FF9800" />
-          <ThemedText style={styles.webNoticeText}>
+          <ThemedText style={tw`ml-3 flex-1 text-sm text-yellow-800 leading-5`}>
             Web版では地図表示に制限があります。{'\n'}
             完全な機能を利用するには、モバイルアプリをご利用ください。
           </ThemedText>
@@ -297,10 +297,10 @@ export default function HomeScreen() {
 
   // モバイル用のマップ画面
   return (
-    <View style={styles.container}>
+    <View style={tw`flex-1`}>
       <MapView
         ref={mapRef}
-        style={styles.map}
+        style={tw`flex-1`}
         initialRegion={userLocation ? {
           ...userLocation,
           latitudeDelta: 0.01,
@@ -321,7 +321,7 @@ export default function HomeScreen() {
               onPress={() => setStatusModalVisible(true)}
             >
               <View style={[
-                styles.userMarker,
+                tw`w-10 h-10 rounded-full justify-center items-center border-2 border-white shadow-md`,
                 { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
               ]}>
                 <Ionicons 
@@ -347,14 +347,14 @@ export default function HomeScreen() {
       </MapView>
 
       {/* ステータス表示バー */}
-      <View style={styles.statusBar}>
+      <View style={tw`absolute top-15 left-5 right-5 bg-white rounded-full px-5 py-3 flex-row items-center shadow-sm`}>
         <View style={[
-          styles.statusIndicator,
+          tw`w-3 h-3 rounded-full mr-3`,
           { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
         ]} />
-        <Text style={styles.statusText}>{getStatusText()}</Text>
+        <Text style={tw`flex-1 text-sm font-medium text-gray-800`}>{getStatusText()}</Text>
         <TouchableOpacity
-          style={styles.editButton}
+          style={tw`p-1`}
           onPress={() => setStatusModalVisible(true)}
         >
           <Ionicons name="create-outline" size={20} color="#007AFF" />
@@ -362,10 +362,10 @@ export default function HomeScreen() {
       </View>
 
       {/* フローティングアクションボタン */}
-      <View style={styles.fabContainer}>
+      <View style={tw`absolute right-5 bottom-25`}>
         {/* 現在地ボタン */}
         <TouchableOpacity
-          style={[styles.fab, styles.locationFab]}
+          style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-white mb-3`}
           onPress={handleMyLocationPress}
         >
           <Ionicons name="locate" size={24} color="#007AFF" />
@@ -373,7 +373,7 @@ export default function HomeScreen() {
 
         {/* ステータス設定ボタン */}
         <TouchableOpacity
-          style={[styles.fab, styles.statusFab]}
+          style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-blue-500`}
           onPress={() => setStatusModalVisible(true)}
         >
           <Ionicons name="add" size={28} color="white" />
@@ -390,232 +390,3 @@ export default function HomeScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 40,
-  },
-  errorTitle: {
-    marginTop: 20,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  errorText: {
-    textAlign: 'center',
-    color: '#666',
-    lineHeight: 24,
-    marginBottom: 30,
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 24,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  userMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  statusBar: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
-    right: 20,
-    backgroundColor: 'white',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  statusText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  editButton: {
-    padding: 4,
-  },
-  fabContainer: {
-    position: 'absolute',
-    right: 20,
-    bottom: 100,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  locationFab: {
-    backgroundColor: 'white',
-    marginBottom: 12,
-  },
-  statusFab: {
-    backgroundColor: '#007AFF',
-  },
-  // Web用のスタイル
-  webHeader: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#007AFF',
-    alignItems: 'center',
-  },
-  webSubtitle: {
-    color: 'white',
-    fontSize: 14,
-    marginTop: 8,
-    opacity: 0.9,
-  },
-  webStatusCard: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  webStatusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  webStatusIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  webStatusContent: {
-    marginBottom: 16,
-  },
-  webStatusText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  webRangeText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  webStatusButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 12,
-  },
-  webStatusButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  webLocationCard: {
-    margin: 20,
-    marginTop: 0,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  webLocationInfo: {
-    marginTop: 16,
-  },
-  webLocationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  webLocationText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  webLocationLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  webLocationValue: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  webNotice: {
-    margin: 20,
-    marginTop: 0,
-    padding: 16,
-    backgroundColor: '#FFF8E1',
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  webNoticeText: {
-    marginLeft: 12,
-    flex: 1,
-    fontSize: 14,
-    color: '#FF8F00',
-    lineHeight: 20,
-  },
-});
