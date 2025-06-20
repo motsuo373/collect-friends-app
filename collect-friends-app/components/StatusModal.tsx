@@ -169,7 +169,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({
                     <TouchableOpacity
                       key={activity.key}
                       style={[
-                        tw`w-[31%] aspect-square bg-gray-100 rounded-2xl justify-center items-center p-2 m-1.5`,
+                        tw`w-[30%] aspect-square bg-gray-100 rounded-2xl justify-center items-center p-2 m-1.5`,
                         selectedActivities.includes(activity.key) && tw`bg-blue-500`,
                       ]}
                       onPress={() => toggleActivity(activity.key)}
