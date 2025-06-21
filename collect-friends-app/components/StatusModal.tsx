@@ -3,13 +3,13 @@ import {
   Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   Alert,
 } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import tw from 'twrnc';
 
 interface StatusModalProps {
   visible: boolean;
@@ -91,43 +91,43 @@ export const StatusModal: React.FC<StatusModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <ThemedView style={styles.container}>
-        <View style={styles.header}>
+      <ThemedView style={tw`flex-1 bg-white`}>
+        <View style={tw`flex-row justify-between items-center p-5 pt-15 border-b border-gray-200`}>
           <ThemedText type="title">ステータス設定</ThemedText>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>×</Text>
+          <TouchableOpacity onPress={onClose} style={tw`w-8 h-8 justify-center items-center bg-gray-100 rounded-full`}>
+            <Text style={tw`text-lg text-gray-600`}>×</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={tw`flex-1 p-5`} showsVerticalScrollIndicator={false}>
           {/* 暇かどうかの設定 */}
-          <View style={styles.section}>
+          <View style={tw`mb-8`}>
             <ThemedText type="subtitle">現在の状況</ThemedText>
-            <View style={styles.toggleContainer}>
+            <View style={tw`flex-row mt-3 bg-gray-100 rounded-full p-1`}>
               <TouchableOpacity
                 style={[
-                  styles.toggleButton,
-                  !isAvailable && styles.toggleButtonActive,
+                  tw`flex-1 py-3 items-center rounded-full`,
+                  !isAvailable && tw`bg-blue-500`,
                 ]}
                 onPress={() => setIsAvailable(false)}
               >
                 <Text style={[
-                  styles.toggleButtonText,
-                  !isAvailable && styles.toggleButtonTextActive,
+                  tw`text-gray-600 font-semibold`,
+                  !isAvailable && tw`text-white`,
                 ]}>
                   忙しい
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.toggleButton,
-                  isAvailable && styles.toggleButtonActive,
+                  tw`flex-1 py-3 items-center rounded-full`,
+                  isAvailable && tw`bg-blue-500`,
                 ]}
                 onPress={() => setIsAvailable(true)}
               >
                 <Text style={[
-                  styles.toggleButtonText,
-                  isAvailable && styles.toggleButtonTextActive,
+                  tw`text-gray-600 font-semibold`,
+                  isAvailable && tw`text-white`,
                 ]}>
                   暇している
                 </Text>
@@ -138,21 +138,21 @@ export const StatusModal: React.FC<StatusModalProps> = ({
           {isAvailable && (
             <>
               {/* いつ暇かの設定 */}
-              <View style={styles.section}>
+              <View style={tw`mb-8`}>
                 <ThemedText type="subtitle">いつ暇？</ThemedText>
-                <View style={styles.optionGrid}>
+                <View style={tw`flex-row flex-wrap mt-3 -m-1`}>
                   {availabilityOptions.map((option) => (
                     <TouchableOpacity
                       key={option.key}
                       style={[
-                        styles.optionButton,
-                        availabilityType === option.key && styles.optionButtonActive,
+                        tw`flex-1 min-w-[45%] py-3 px-4 bg-gray-100 rounded-xl items-center m-1`,
+                        availabilityType === option.key && tw`bg-blue-500`,
                       ]}
                       onPress={() => setAvailabilityType(option.key as UserStatus['availabilityType'])}
                     >
                       <Text style={[
-                        styles.optionButtonText,
-                        availabilityType === option.key && styles.optionButtonTextActive,
+                        tw`text-gray-600 font-medium`,
+                        availabilityType === option.key && tw`text-white`,
                       ]}>
                         {option.label}
                       </Text>
@@ -162,22 +162,22 @@ export const StatusModal: React.FC<StatusModalProps> = ({
               </View>
 
               {/* やりたいことの設定 */}
-              <View style={styles.section}>
+              <View style={tw`mb-8`}>
                 <ThemedText type="subtitle">やりたいこと</ThemedText>
-                <View style={styles.activityGrid}>
+                <View style={tw`flex-row flex-wrap mt-3 -m-1.5`}>
                   {activityOptions.map((activity) => (
                     <TouchableOpacity
                       key={activity.key}
                       style={[
-                        styles.activityButton,
-                        selectedActivities.includes(activity.key) && styles.activityButtonActive,
+                        tw`w-[30%] aspect-square bg-gray-100 rounded-2xl justify-center items-center p-2 m-1.5`,
+                        selectedActivities.includes(activity.key) && tw`bg-blue-500`,
                       ]}
                       onPress={() => toggleActivity(activity.key)}
                     >
-                      <Text style={styles.activityEmoji}>{activity.emoji}</Text>
+                      <Text style={tw`text-2xl mb-2`}>{activity.emoji}</Text>
                       <Text style={[
-                        styles.activityButtonText,
-                        selectedActivities.includes(activity.key) && styles.activityButtonTextActive,
+                        tw`text-gray-600 text-xs font-medium text-center`,
+                        selectedActivities.includes(activity.key) && tw`text-white`,
                       ]}>
                         {activity.label}
                       </Text>
@@ -187,21 +187,21 @@ export const StatusModal: React.FC<StatusModalProps> = ({
               </View>
 
               {/* 移動範囲の設定 */}
-              <View style={styles.section}>
+              <View style={tw`mb-8`}>
                 <ThemedText type="subtitle">移動可能範囲</ThemedText>
-                <View style={styles.rangeGrid}>
+                <View style={tw`mt-3`}>
                   {moveRangeOptions.map((range) => (
                     <TouchableOpacity
                       key={range.distance}
                       style={[
-                        styles.rangeButton,
-                        moveRange === range.distance && styles.rangeButtonActive,
+                        tw`py-3 px-4 bg-gray-100 rounded-xl mb-2`,
+                        moveRange === range.distance && tw`bg-blue-500`,
                       ]}
                       onPress={() => setMoveRange(range.distance)}
                     >
                       <Text style={[
-                        styles.rangeButtonText,
-                        moveRange === range.distance && styles.rangeButtonTextActive,
+                        tw`text-gray-600 font-medium text-center`,
+                        moveRange === range.distance && tw`text-white`,
                       ]}>
                         {range.label}
                       </Text>
@@ -213,162 +213,12 @@ export const StatusModal: React.FC<StatusModalProps> = ({
           )}
         </ScrollView>
 
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>保存</Text>
+        <View style={tw`p-5 pb-10`}>
+          <TouchableOpacity style={tw`bg-blue-500 py-4 rounded-xl`} onPress={handleSave}>
+            <Text style={tw`text-white text-base font-semibold text-center`}>保存</Text>
           </TouchableOpacity>
         </View>
       </ThemedView>
     </Modal>
   );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 15,
-  },
-  closeButtonText: {
-    fontSize: 18,
-    color: '#666',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    marginTop: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 25,
-    padding: 4,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 20,
-  },
-  toggleButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  toggleButtonText: {
-    color: '#666',
-    fontWeight: '600',
-  },
-  toggleButtonTextActive: {
-    color: '#fff',
-  },
-  optionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    gap: 10,
-  },
-  optionButton: {
-    flex: 1,
-    minWidth: '45%',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  optionButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  optionButtonText: {
-    color: '#666',
-    fontWeight: '500',
-  },
-  optionButtonTextActive: {
-    color: '#fff',
-  },
-  activityGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    gap: 12,
-  },
-  activityButton: {
-    width: '31%',
-    aspectRatio: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 8,
-  },
-  activityButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  activityEmoji: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  activityButtonText: {
-    color: '#666',
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  activityButtonTextActive: {
-    color: '#fff',
-  },
-  rangeGrid: {
-    marginTop: 10,
-  },
-  rangeButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  rangeButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  rangeButtonText: {
-    color: '#666',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  rangeButtonTextActive: {
-    color: '#fff',
-  },
-  footer: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-}); 
+}; 

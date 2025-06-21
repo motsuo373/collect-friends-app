@@ -1,5 +1,6 @@
 import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
 import { StyleProp, ViewStyle } from 'react-native';
+import tw from 'twrnc';
 
 export function IconSymbol({
   name,
@@ -21,10 +22,10 @@ export function IconSymbol({
       resizeMode="scaleAspectFit"
       name={name}
       style={[
-        {
+        tw.style({
           width: size,
           height: size,
-        },
+        }),
         style,
       ]}
     />
