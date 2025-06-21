@@ -2,18 +2,19 @@
 
 ## アプリ概要
 
-「今すぐ遊べる人、近くにいない？」をサクッと解決する位置情報ベースの即日マッチングアプリ。
+「今すぐ遊べる人、近くにいない？」をサクッと解決する位置情報ベースの友達同士の即日集まりアプリ。
 
-フットワークが軽い人同士をリアルタイムで繋げ、「今日暇だな」「明日時間できた」という即日・翌日のニーズに特化したマッチング＆自動提案アプリ。
+フットワークが軽い友達同士をリアルタイムで繋げ、「今日暇だな」「明日時間できた」という即日・翌日のニーズに特化したフォロー型SNS＆自動提案アプリ。
 
 ## 主要機能概要
 
 ### コアコンセプト
-- 位置情報ベースの即日マッチング（今日・明日限定）
-- フットワークの軽いユーザー同士の迅速な繋がり
+- 位置情報ベースの即日友達集まり（今日・明日限定）
+- フットワークの軽い友達同士の迅速な繋がり
 - 地図上での暇ステータス可視化
 - 30分〜3時間程度のライトな集まりに特化
-- シンプルなフォロー関係での安心・安全な出会い
+- フォロー・フォロワー関係での安心・安全な友達交流
+- 友達の友達まで繋がれるネットワーク拡張
 
 ## 詳細機能仕様
 
@@ -29,15 +30,17 @@
   - 趣味・興味カテゴリー設定
   - プライバシー設定
 
-#### 1.2 フレンド管理
-- **フレンド追加**
+#### 1.2 フォロー・フォロワー管理
+- **フォロー機能**
   - QRコード、招待リンク、ユーザー名検索
   - SNS感覚での相互フォロー機能
+  - 友達の友達表示・フォロー提案
   
-- **フレンドリスト**
-  - フレンド一覧表示
+- **フォロワーリスト**
+  - フォロワー・フォロイー一覧表示
   - オンライン状況・暇ステータス表示
-  - フレンドのカテゴリー管理
+  - フォロワーのカテゴリー管理
+  - 友達の友達ネットワーク表示
 
 ### 2. ステータス管理機能
 
@@ -62,22 +65,23 @@
   - 大学、会社、サークル、趣味グループなど
   - 複数タグ所属可能
   
-- **タグベースマッチング**
-  - 同じタグ内でのステータス共有
+- **タグベースフォロー**
+  - 同じタグ内でのフォロー促進
+  - タグごとの友達・ステータス共有
   - タグごとの通知設定
 
-### 4. マッチング・提案機能
+### 4. 友達検索・提案機能
 
-#### 4.1 位置情報ベースマッチング
-- **地図上でのマッチング**
+#### 4.1 位置情報ベース友達検索
+- **地図上での友達表示**
   - 指定範囲内の暇なフォロワー表示
   - リアルタイム位置情報更新
   - 距離・時間・やりたいことの一致度を考慮
   
-- **即日マッチング**
+- **即日集まり提案**
   - 今日中の予定に限定
   - 明日の予定は前日夜まで
-  - 30分以内の迅速なレスポンス推奨
+  - フォロワー同士での迅速なやりとり
 
 #### 4.2 AIライトプラン提案
 - **近場のライト提案**
@@ -134,9 +138,10 @@
 ### 7. 通知機能
 
 #### 7.1 リアルタイム通知
-- **マッチング通知**
-  - 暇な友人の発見通知
+- **友達活動通知**
+  - 暇なフォロワーの発見通知
   - おすすめプランの提案通知
+  - 友達の友達からのフォロー提案
   
 - **コミュニティ通知**
   - 同じタグメンバーの活動状況
@@ -161,14 +166,15 @@
 - **フィルター機能（やりたいこと別）**
 
 ### フォロワー画面
-- **フォロワー一覧・現在ステータス**
-- **新しいフォロワー追加（QR・ID検索）**
+- **フォロワー・フォロイー一覧・現在ステータス**
+- **新しいフォロー追加（QR・ID検索）**
+- **友達の友達表示・フォロー提案**
 - **位置情報共有設定**
 - **コミュニティタグ管理**
 
 ### チャット・通知画面
 - **アクティブな会話一覧**
-- **マッチング通知**
+- **友達活動通知**
 - **迅速な返答（テンプレート）**
 - **位置共有チャット**
 
@@ -189,14 +195,14 @@
 
 ### ケース2: 夕方から軽く飲み
 1. 15時頃「夕方から軽く飲みたい」投稿
-2. 近くの暇なフォロワー2-3人とマッチング
+2. 近くの暇なフォロワー2-3人に通知
 3. 18-19時開始で予約不要の居酒屋提案
 4. グループチャットで簡単調整
 5. 当日夕方に実行
 
 ### ケース3: 急な買い物同行
 1. 「買い物付き合ってくれる人いない？」投稿
-2. ショッピング好きのフォロワーとマッチング
+2. ショッピング好きのフォロワーに通知
 3. 最寄りの商業施設・モールを提案
 4. 待ち合わせ場所と時間を決定
 5. 2-3時間の買い物タイム
@@ -204,7 +210,7 @@
 ### ケース4: 散歩・ぶらぶら
 1. 天気の良い日に「散歩したい」ステータス設定
 2. 近くの公園・商店街エリアのフォロワー検索
-3. 共通の行きたい場所でマッチング
+3. 共通の行きたい場所で合流相談
 4. 気軽に合流・1時間程度の散歩
 5. 解散も気軽にできるライトな交流
 
@@ -218,7 +224,7 @@
 graph TB
     subgraph "Firestore Database"
         Users["👥 users<br/>Collection"]
-        Friendships["🤝 friendships<br/>Collection"]
+        Follows["🤝 follows<br/>Collection"]
         Communities["🏷️ communities<br/>Collection"]
         Chats["💬 chats<br/>Collection"]
         Events["📅 events<br/>Collection"]
@@ -229,8 +235,8 @@ graph TB
             UserStatus["status: {<br/>• current: 'free'|'busy'|'offline'<br/>• mood: string[]<br/>• availableUntil: timestamp<br/>• location?: geopoint<br/>• range?: number<br/>}"]
         end
         
-        subgraph "Friendship Document"
-            FriendDoc["Friendship Document<br/>{friendshipId}<br/>• user1Ref: reference<br/>• user2Ref: reference<br/>• status: 'pending'|'accepted'<br/>• createdAt: timestamp<br/>• acceptedAt?: timestamp"]
+        subgraph "Follow Document"
+            FollowDoc["Follow Document<br/>{followId}<br/>• followerRef: reference<br/>• followeeRef: reference<br/>• status: 'pending'|'accepted'<br/>• createdAt: timestamp<br/>• acceptedAt?: timestamp"]
         end
         
         subgraph "Community Document"
@@ -253,7 +259,7 @@ graph TB
     end
     
     %% Relationships
-    Users -->|"References"| FriendDoc
+    Users -->|"References"| FollowDoc
     Users -->|"References"| CommunityDoc
     Users -->|"References"| ChatDoc
     Users -->|"References"| EventDoc
@@ -272,15 +278,15 @@ graph TB
     classDef document fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef subcollection fill:#fff3e0,stroke:#e65100,stroke-width:2px
     
-    class Users,Friendships,Communities,Chats,Events,Notifications collection
-    class UserDoc,FriendDoc,CommunityDoc,ChatDoc,EventDoc,NotificationDoc document
+    class Users,Follows,Communities,Chats,Events,Notifications collection
+    class UserDoc,FollowDoc,CommunityDoc,ChatDoc,EventDoc,NotificationDoc document
     class Messages subcollection
 ```
 
 #### 主要コレクション詳細
 
 - **users**: ユーザー情報、リアルタイムステータス
-- **friendships**: 友人関係の管理（双方向参照）
+- **follows**: フォロー・フォロワー関係の管理
 - **communities**: コミュニティタグとメンバー管理
 - **chats**: チャットルーム（messagesサブコレクション含む）
 - **events**: 予定・イベント情報
