@@ -1,19 +1,33 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import Constants from 'expo-constants';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
-// 環境変数からFirebaseの設定を取得
+// Firebase設定（直接記述で確実に動作させる）
 const firebaseConfig = {
-  apiKey: Constants.expoConfig?.extra?.firebaseApiKey || process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: Constants.expoConfig?.extra?.firebaseAuthDomain || process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: Constants.expoConfig?.extra?.firebaseProjectId || process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: Constants.expoConfig?.extra?.firebaseStorageBucket || process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: Constants.expoConfig?.extra?.firebaseMessagingSenderId || process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: Constants.expoConfig?.extra?.firebaseAppId || process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  measurementId: Constants.expoConfig?.extra?.firebaseMeasurementId || process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyBZnjTFi_OJ4bF1IIY_Cr50Qu08EmXzDhU",
+  authDomain: "collect-friends-app.firebaseapp.com",
+  projectId: "collect-friends-app",
+  storageBucket: "collect-friends-app.firebasestorage.app",
+  messagingSenderId: "901027702238",
+  appId: "1:901027702238:web:bd4742765b36c18965a94f",
+  measurementId: "G-NF4579MH3F"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+console.log('Initializing Firebase with config:', firebaseConfig);
 
-export { db }; 
+// Firebase アプリを初期化
+const app = initializeApp(firebaseConfig);
+console.log('Firebase app initialized');
+
+// Firestore を初期化
+const db = getFirestore(app);
+console.log('Firestore initialized');
+
+// Firebase Auth を AsyncStorage で初期化
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+console.log('Firebase Auth initialized with AsyncStorage');
+
+export { db, auth }; 
