@@ -2,7 +2,15 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
-import { v4 as uuidv4 } from 'uuid';
+
+// React Native用のUUID生成関数
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 interface AuthContextType {
   user: User | null;
@@ -57,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // 新規ユーザーの場合、追加のUUIDを生成してドキュメントを作成
         const userData = {
           uid: firebaseUser.uid,
-          customUuid: uuidv4(), // 任意のUUID
+          customUuid: generateUUID(), // 任意のUUID
           name: firebaseUser.displayName || '',
           email: firebaseUser.email || '',
           avatar: firebaseUser.photoURL || '',

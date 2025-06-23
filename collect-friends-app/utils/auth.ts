@@ -2,18 +2,70 @@ import {
   GoogleAuthProvider, 
   TwitterAuthProvider, 
   signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult
+  signInWithCredential,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  User
 } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth, GOOGLE_WEB_CLIENT_ID } from '../firebaseConfig';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-// Google認証
+// WebBrowserの設定を完了する
+WebBrowser.maybeCompleteAuthSession();
+
+// メール認証 - 新規登録
+export const signUpWithEmail = async (email: string, password: string, displayName: string) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    // ユーザー名を設定
+    await updateProfile(user, {
+      displayName: displayName
+    });
+    
+    console.log('新規登録成功:', user);
+    return user;
+  } catch (error) {
+    console.error('新規登録エラー:', error);
+    throw error;
+  }
+};
+
+// メール認証 - ログイン
+export const signInWithEmail = async (email: string, password: string) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    console.log('メールログイン成功:', userCredential.user);
+    return userCredential.user;
+  } catch (error) {
+    console.error('メールログインエラー:', error);
+    throw error;
+  }
+};
+
+// ログアウト
+export const signOutUser = async () => {
+  try {
+    await signOut(auth);
+    console.log('ログアウト成功');
+  } catch (error) {
+    console.error('ログアウトエラー:', error);
+    throw error;
+  }
+};
+
+// Google認証（WebBrowser使用）
 export const signInWithGoogle = async () => {
   try {
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      throw new Error('Google Web Client IDが設定されていません');
+    }
+
     if (Platform.OS === 'web') {
       // Web版の場合
       const provider = new GoogleAuthProvider();
@@ -23,27 +75,56 @@ export const signInWithGoogle = async () => {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } else {
-      // モバイル版の場合 (Expo Auth Session使用)
-      const redirectUri = AuthSession.makeRedirectUri();
-
-      const request = new AuthSession.AuthRequest({
-        clientId: Constants.expoConfig?.extra?.googleClientId || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-        scopes: ['openid', 'profile', 'email'],
-        redirectUri,
-        responseType: AuthSession.ResponseType.Code,
+      // モバイル版 - WebBrowserを使用
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'collectfriendsapp',
       });
+      
+      const authUrl = 
+        `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${GOOGLE_WEB_CLIENT_ID}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=openid%20profile%20email&` +
+        `access_type=offline&` +
+        `prompt=select_account`;
 
-      const result = await request.promptAsync({
-        authorizationEndpoint: 'https://accounts.google.com/oauth/authorize',
-      });
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      
+      if (result.type === 'success' && result.url) {
+        const url = new URL(result.url);
+        const code = url.searchParams.get('code');
+        
+        if (code) {
+          // 認証コードをアクセストークンに交換
+          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: GOOGLE_WEB_CLIENT_ID,
+              code: code,
+              redirect_uri: redirectUri,
+              grant_type: 'authorization_code',
+            }).toString(),
+          });
 
-      if (result.type === 'success') {
-        // Google認証が成功した場合の処理
-        console.log('Google認証成功:', result);
-        return result;
-      } else {
-        throw new Error('Google認証がキャンセルされました');
+          const tokenData = await tokenResponse.json();
+          
+          if (tokenData.access_token && tokenData.id_token) {
+            const credential = GoogleAuthProvider.credential(
+              tokenData.id_token,
+              tokenData.access_token
+            );
+            
+            const firebaseResult = await signInWithCredential(auth, credential);
+            return firebaseResult.user;
+          }
+        }
+      } else if (result.type === 'cancel') {
+        throw new Error('ユーザーが認証をキャンセルしました');
       }
+      
+      throw new Error('認証に失敗しました');
     }
   } catch (error) {
     console.error('Google認証エラー:', error);
@@ -60,26 +141,8 @@ export const signInWithTwitter = async () => {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } else {
-      // モバイル版の場合
-      const redirectUri = AuthSession.makeRedirectUri();
-
-      const request = new AuthSession.AuthRequest({
-        clientId: Constants.expoConfig?.extra?.twitterClientId || process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID,
-        scopes: ['tweet.read', 'users.read'],
-        redirectUri,
-        responseType: AuthSession.ResponseType.Code,
-      });
-
-      const result = await request.promptAsync({
-        authorizationEndpoint: 'https://twitter.com/i/oauth2/authorize',
-      });
-
-      if (result.type === 'success') {
-        console.log('Twitter認証成功:', result);
-        return result;
-      } else {
-        throw new Error('Twitter認証がキャンセルされました');
-      }
+      // モバイル版は後で実装
+      throw new Error('Twitter認証はまだサポートされていません');
     }
   } catch (error) {
     console.error('Twitter認証エラー:', error);
@@ -90,31 +153,10 @@ export const signInWithTwitter = async () => {
 // LINE認証（将来的な実装用）
 export const signInWithLine = async () => {
   try {
-    // LINE認証は現在ExpoのWeb Browserを使用したカスタム実装が必要
-    const redirectUri = AuthSession.makeRedirectUri();
-
-    const request = new AuthSession.AuthRequest({
-      clientId: Constants.expoConfig?.extra?.lineClientId || process.env.EXPO_PUBLIC_LINE_CLIENT_ID,
-      scopes: ['profile', 'openid'],
-      redirectUri,
-      responseType: AuthSession.ResponseType.Code,
-    });
-
-    const result = await request.promptAsync({
-      authorizationEndpoint: 'https://access.line.me/oauth2/v2.1/authorize',
-    });
-
-    if (result.type === 'success') {
-      console.log('LINE認証成功:', result);
-      return result;
-    } else {
-      throw new Error('LINE認証がキャンセルされました');
-    }
+    // LINE認証は後で実装
+    throw new Error('LINE認証はまだサポートされていません');
   } catch (error) {
     console.error('LINE認証エラー:', error);
     throw error;
   }
-};
-
-// WebBrowserの設定を完了する
-WebBrowser.maybeCompleteAuthSession(); 
+}; 

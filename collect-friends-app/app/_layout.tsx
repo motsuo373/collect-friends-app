@@ -6,8 +6,8 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { LoginScreen } from '@/components/LoginScreen';
-import { View, ActivityIndicator } from 'react-native';
+import LoginScreen from '@/components/LoginScreen';
+import { View, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -23,15 +23,17 @@ function AppContent() {
 
   if (!user) {
     // 未ログインの場合はログイン画面を表示
-    return <LoginScreen />;
+    return <LoginScreen onLoginSuccess={() => {}} />;
   }
 
   // ログイン済みの場合は通常のアプリ画面を表示
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </View>
   );
 }
 
@@ -50,7 +52,7 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AppContent />
-        <StatusBar style="auto" />
+        <StatusBar style="light" translucent={false} />
       </ThemeProvider>
     </AuthProvider>
   );

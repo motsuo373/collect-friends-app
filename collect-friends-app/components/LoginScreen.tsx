@@ -5,270 +5,307 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Image,
-  SafeAreaView,
-  ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { signInWithGoogle, signInWithTwitter, signInWithLine } from '../utils/auth';
+import { signInWithGoogle, signInWithTwitter, signInWithLine, signInWithEmail } from '../utils/auth';
+import { ThemedText } from './ThemedText';
+import { ThemedView } from './ThemedView';
+import SignUpScreen from './SignUpScreen';
 
 interface LoginScreenProps {
-  onLoginSuccess?: () => void;
+  onLoginSuccess: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
-  const handleGoogleSignIn = async () => {
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('エラー', 'メールアドレスとパスワードを入力してください');
+      return;
+    }
+
     setLoading(true);
-    setLoadingProvider('google');
     try {
-      const result = await signInWithGoogle();
-      if (result) {
-        onLoginSuccess?.();
+      await signInWithEmail(email, password);
+      onLoginSuccess();
+    } catch (error: any) {
+      console.error('メールログインエラー:', error);
+      let errorMessage = 'ログインに失敗しました';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'ユーザーが見つかりません';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'パスワードが間違っています';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'メールアドレスの形式が正しくありません';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'ログイン試行回数が多すぎます。しばらく待ってから再試行してください';
       }
+      
+      Alert.alert('エラー', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+      onLoginSuccess();
     } catch (error) {
-      Alert.alert('ログインエラー', 'Googleログインに失敗しました。もう一度お試しください。');
       console.error('Google login error:', error);
-    } finally {
-      setLoading(false);
-      setLoadingProvider(null);
+      Alert.alert('エラー', 'Googleログインに失敗しました');
     }
   };
 
-  const handleTwitterSignIn = async () => {
-    setLoading(true);
-    setLoadingProvider('twitter');
+  const handleTwitterLogin = async () => {
     try {
-      const result = await signInWithTwitter();
-      if (result) {
-        onLoginSuccess?.();
-      }
+      await signInWithTwitter();
+      onLoginSuccess();
     } catch (error) {
-      Alert.alert('ログインエラー', 'Xログインに失敗しました。もう一度お試しください。');
       console.error('Twitter login error:', error);
-    } finally {
-      setLoading(false);
-      setLoadingProvider(null);
+      Alert.alert('エラー', 'Twitterログインに失敗しました');
     }
   };
 
-  const handleLineSignIn = async () => {
-    setLoading(true);
-    setLoadingProvider('line');
+  const handleLineLogin = async () => {
     try {
-      const result = await signInWithLine();
-      if (result) {
-        onLoginSuccess?.();
-      }
+      await signInWithLine();
+      onLoginSuccess();
     } catch (error) {
-      Alert.alert('ログインエラー', 'LINEログインに失敗しました。もう一度お試しください。');
       console.error('LINE login error:', error);
-    } finally {
-      setLoading(false);
-      setLoadingProvider(null);
+      Alert.alert('エラー', 'LINEログインに失敗しました');
     }
   };
 
-  const AuthButton = ({ 
-    onPress, 
-    backgroundColor, 
-    textColor, 
-    icon, 
-    text, 
-    provider 
-  }: {
-    onPress: () => void;
-    backgroundColor: string;
-    textColor: string;
-    icon: string;
-    text: string;
-    provider: string;
-  }) => (
-    <TouchableOpacity
-      style={[styles.authButton, { backgroundColor }]}
-      onPress={onPress}
-      disabled={loading}
-    >
-      {loadingProvider === provider ? (
-        <ActivityIndicator color={textColor} size="small" />
-      ) : (
-        <>
-          <Text style={[styles.authButtonIcon, { color: textColor }]}>{icon}</Text>
-          <Text style={[styles.authButtonText, { color: textColor }]}>{text}</Text>
-        </>
-      )}
-    </TouchableOpacity>
-  );
+  if (showSignUp) {
+    return (
+      <SignUpScreen
+        onSwitchToLogin={() => setShowSignUp(false)}
+        onSignUpSuccess={() => {
+          setShowSignUp(false);
+          onLoginSuccess();
+        }}
+      />
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        style={styles.background}
-      >
-        <View style={styles.content}>
-          {/* ロゴ・ヘッダー部分 */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoIcon}>👥</Text>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ThemedView style={styles.loginContainer}>
+          <ThemedText style={styles.title}>Collect Friends</ThemedText>
+          <ThemedText style={styles.subtitle}>今すぐ遊べる友達を見つけよう！</ThemedText>
+          
+          {/* メール認証フォーム */}
+          <View style={styles.emailForm}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>メールアドレス</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="メールアドレスを入力"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
             </View>
-            <Text style={styles.appTitle}>Collect Friends</Text>
-            <Text style={styles.subtitle}>今すぐ遊べる人、近くにいない？</Text>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>パスワード</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="パスワードを入力"
+                secureTextEntry
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.loginButton, loading && styles.buttonDisabled]}
+              onPress={handleEmailLogin}
+              disabled={loading}
+            >
+              <Text style={styles.loginButtonText}>
+                {loading ? 'ログイン中...' : 'メールでログイン'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.signUpLink}
+              onPress={() => setShowSignUp(true)}
+            >
+              <Text style={styles.signUpLinkText}>
+                アカウントをお持ちでない方はこちら
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* 説明文 */}
-          <View style={styles.description}>
-            <Text style={styles.descriptionText}>
-              位置情報ベースで友達同士の即日集まりを実現するアプリです。
-            </Text>
-            <Text style={styles.descriptionText}>
-              フットワークが軽い友達とリアルタイムで繋がりましょう！
-            </Text>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>または</Text>
+            <View style={styles.dividerLine} />
           </View>
 
-          {/* ログインボタン */}
-          <View style={styles.authSection}>
-            <Text style={styles.loginTitle}>ログインして始める</Text>
-            
-            <AuthButton
-              onPress={handleGoogleSignIn}
-              backgroundColor="#ffffff"
-              textColor="#333333"
-              icon="🔍"
-              text="Googleでログイン"
-              provider="google"
-            />
+          {/* SNSログインボタン */}
+          <View style={styles.socialButtonsContainer}>
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
+              <Text style={styles.googleButtonText}>Googleでログイン</Text>
+            </TouchableOpacity>
 
-            <AuthButton
-              onPress={handleTwitterSignIn}
-              backgroundColor="#1DA1F2"
-              textColor="#ffffff"
-              icon="🐦"
-              text="X(Twitter)でログイン"
-              provider="twitter"
-            />
+            <TouchableOpacity style={styles.twitterButton} onPress={handleTwitterLogin}>
+              <Text style={styles.twitterButtonText}>Twitterでログイン</Text>
+            </TouchableOpacity>
 
-            <AuthButton
-              onPress={handleLineSignIn}
-              backgroundColor="#00B900"
-              textColor="#ffffff"
-              icon="💬"
-              text="LINEでログイン"
-              provider="line"
-            />
+            <TouchableOpacity style={styles.lineButton} onPress={handleLineLogin}>
+              <Text style={styles.lineButtonText}>LINEでログイン</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* フッター */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              ログインすることで利用規約とプライバシーポリシーに同意したものとみなします
-            </Text>
-          </View>
-        </View>
-      </LinearGradient>
-    </SafeAreaView>
+        </ThemedView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  background: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 32,
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
+    padding: 20,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoIcon: {
-    fontSize: 40,
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#ffffff',
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  description: {
-    marginBottom: 40,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 8,
-    opacity: 0.8,
-  },
-  authSection: {
-    marginBottom: 40,
-  },
-  loginTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  authButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 56,
-    borderRadius: 28,
-    marginBottom: 16,
-    elevation: 2,
+  loginContainer: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 30,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
   },
-  authButtonIcon: {
-    fontSize: 20,
-    marginRight: 12,
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+    color: '#333',
   },
-  authButtonText: {
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 30,
+    color: '#666',
+  },
+  emailForm: {
+    marginBottom: 20,
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  loginButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  signUpLink: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  signUpLinkText: {
+    color: '#007AFF',
+    fontSize: 16,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 15,
+    color: '#666',
+    fontSize: 14,
+  },
+  socialButtonsContainer: {
+    gap: 15,
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+  },
+  googleButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  footer: {
+  twitterButton: {
+    backgroundColor: '#1DA1F2',
+    borderRadius: 8,
+    padding: 15,
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
-  footerText: {
-    fontSize: 12,
-    color: '#ffffff',
-    textAlign: 'center',
-    opacity: 0.7,
-    lineHeight: 18,
+  twitterButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  lineButton: {
+    backgroundColor: '#00C300',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+  },
+  lineButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

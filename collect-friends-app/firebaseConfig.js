@@ -5,14 +5,17 @@ import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase設定（直接記述で確実に動作させる）
 const firebaseConfig = {
-  apiKey: "AIzaSyBZnjTFi_OJ4bF1IIY_Cr50Qu08EmXzDhU",
-  authDomain: "collect-friends-app.firebaseapp.com",
-  projectId: "collect-friends-app",
-  storageBucket: "collect-friends-app.firebasestorage.app",
-  messagingSenderId: "901027702238",
-  appId: "1:901027702238:web:bd4742765b36c18965a94f",
-  measurementId: "G-NF4579MH3F"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
+
+// Google OAuth Web Client ID（Google Cloud Consoleで作成したもの）
+export const GOOGLE_WEB_CLIENT_ID = "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";
 
 console.log('Initializing Firebase with config:', firebaseConfig);
 

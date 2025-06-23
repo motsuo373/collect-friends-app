@@ -7,12 +7,14 @@ import {
   Text,
   ActivityIndicator,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusModal, UserStatus } from '@/components/StatusModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useAuth } from '@/contexts/AuthContext';
 import tw from 'twrnc';
 
 // Platform別のインポート
@@ -42,6 +44,7 @@ const INITIAL_REGION = {
 };
 
 export default function HomeScreen() {
+  const { user } = useAuth();
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [userStatus, setUserStatus] = useState<UserStatus>({
     isAvailable: false,
@@ -300,7 +303,7 @@ export default function HomeScreen() {
     <View style={tw`flex-1`}>
       <MapView
         ref={mapRef}
-        style={tw`flex-1`}
+        style={tw`absolute inset-0`}
         initialRegion={userLocation ? {
           ...userLocation,
           latitudeDelta: 0.01,
@@ -346,23 +349,26 @@ export default function HomeScreen() {
         )}
       </MapView>
 
-      {/* ステータス表示バー */}
-      <View style={tw`absolute top-15 left-5 right-5 bg-white rounded-full px-5 py-3 flex-row items-center shadow-sm`}>
-        <View style={[
-          tw`w-3 h-3 rounded-full mr-3`,
-          { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
-        ]} />
-        <Text style={tw`flex-1 text-sm font-medium text-gray-800`}>{getStatusText()}</Text>
-        <TouchableOpacity
-          style={tw`p-1`}
-          onPress={() => setStatusModalVisible(true)}
-        >
-          <Ionicons name="create-outline" size={20} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
+      {/* ステータス表示バー - セーフエリア内に配置 */}
+      <SafeAreaView style={tw`absolute top-0 left-0 right-0`}>
+        <View style={tw`mx-4 mt-2 bg-white rounded-full px-4 py-3 flex-row items-center shadow-lg`}>
+          <View style={[
+            tw`w-3 h-3 rounded-full mr-3`,
+            { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
+          ]} />
+          <Text style={tw`flex-1 text-sm font-medium text-gray-800`}>{getStatusText()}</Text>
+          <TouchableOpacity
+            style={tw`p-1`}
+            onPress={() => setStatusModalVisible(true)}
+          >
+            <Ionicons name="create-outline" size={20} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
 
-      {/* フローティングアクションボタン */}
-      <View style={tw`absolute right-5 bottom-25`}>
+      {/* フローティングアクションボタン - セーフエリア内に配置 */}
+      <SafeAreaView style={tw`absolute right-0 bottom-0`}>
+        <View style={tw`mr-4 mb-20`}>
         {/* 現在地ボタン */}
         <TouchableOpacity
           style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-white mb-3`}
@@ -378,7 +384,8 @@ export default function HomeScreen() {
         >
           <Ionicons name="add" size={28} color="white" />
         </TouchableOpacity>
-      </View>
+        </View>
+      </SafeAreaView>
 
       {/* ステータス設定モーダル */}
       <StatusModal
