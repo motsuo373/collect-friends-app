@@ -10,12 +10,20 @@ import {
   User
 } from 'firebase/auth';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../firebaseConfig';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import { Platform } from 'react-native';
 
-// WebBrowserの設定を完了する
-WebBrowser.maybeCompleteAuthSession();
+// プラットフォーム別のモジュール読み込み
+let WebBrowser: any = null;
+let AuthSession: any = null;
+
+if (Platform.OS !== 'web') {
+  // ネイティブ環境でのみExpoモジュールを読み込み
+  WebBrowser = require('expo-web-browser');
+  AuthSession = require('expo-auth-session');
+  
+  // WebBrowserの設定を完了する
+  WebBrowser.maybeCompleteAuthSession();
+}
 
 // メール認証 - 新規登録
 export const signUpWithEmail = async (email: string, password: string, displayName: string) => {
@@ -76,6 +84,10 @@ export const signInWithGoogle = async () => {
       return result.user;
     } else {
       // モバイル版 - WebBrowserを使用
+      if (!WebBrowser || !AuthSession) {
+        throw new Error('WebBrowser or AuthSession is not available');
+      }
+      
       const redirectUri = AuthSession.makeRedirectUri({
         scheme: 'collectfriendsapp',
       });

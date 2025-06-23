@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { Auth } from 'firebase/auth';
+import { Platform } from 'react-native';
 
 // Firebase設定（直接記述で確実に動作させる）
 const firebaseConfig = {
@@ -27,10 +27,33 @@ console.log('Firebase app initialized');
 const db = getFirestore(app);
 console.log('Firestore initialized');
 
-// Firebase Auth を AsyncStorage で初期化
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
-console.log('Firebase Auth initialized with AsyncStorage');
+// プラットフォーム別のFirebase Auth初期化
+let auth: Auth;
+
+if (Platform.OS === 'web') {
+  // Web環境の場合
+  const { getAuth, browserLocalPersistence, setPersistence } = require('firebase/auth');
+  
+  auth = getAuth(app);
+  
+  // Web環境でのpersistence設定
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log('Firebase Auth initialized with browserLocalPersistence for web');
+    })
+    .catch((error) => {
+      console.error('Failed to set persistence for web:', error);
+    });
+    
+} else {
+  // ネイティブ環境の場合
+  const { initializeAuth, getReactNativePersistence } = require('firebase/auth');
+  const ReactNativeAsyncStorage = require('@react-native-async-storage/async-storage').default;
+  
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+  });
+  console.log('Firebase Auth initialized with AsyncStorage for native');
+}
 
 export { db, auth }; 
