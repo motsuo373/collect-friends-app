@@ -39,6 +39,12 @@
   - Authentication (認証)
   - Cloud Messaging (プッシュ通知)
 
+### マップ・位置情報
+- **React Native Maps**: 1.20.1 (ネイティブアプリ用)
+- **React Leaflet**: ^4.2.1 (Web用マップ)
+- **Leaflet**: ^1.9.4 (Web用地図ライブラリ)
+- **Expo Location**: 位置情報取得
+
 ### ナビゲーション・UI
 - **React Navigation**: ^7.1.6
 - **React Native Gesture Handler**: ~2.24.0
@@ -174,7 +180,14 @@ npm run reset-project
 - **Expo Go**: スマートフォンでExpo Goアプリをダウンロードし、QRコードをスキャン
 - **iOS Simulator**: Xcodeに含まれるiOSシミュレーター
 - **Android Emulator**: Android Studioのエミュレーター
-- **Web**: ブラウザでの確認（機能制限あり）
+- **Web**: ブラウザでの確認（Leafletベースのマップが表示されます）
+
+#### Web版の特徴
+- **マップ表示**: Leaflet + OpenStreetMapを使用したインタラクティブマップ
+- **位置情報**: Web Geolocation APIで現在地取得
+- **マーカー**: 絵文字ベースのカスタムマーカー表示
+- **移動範囲**: 円形エリアでの移動可能範囲表示
+- **現在地移動**: ボタンクリックでマップ中心を現在地に移動
 
 ## プロジェクト構造
 
@@ -186,7 +199,9 @@ collect-friends-app/
 │       ├── index.tsx    # ホーム（マップ）画面
 │       └── explore.tsx  # プロフィール画面
 ├── components/          # 再利用可能コンポーネント
-│   └── LoginScreen.tsx  # ログイン画面
+│   ├── LoginScreen.tsx  # ログイン画面
+│   ├── WebMap.tsx       # Web版マップコンポーネント（Leaflet）
+│   └── StatusModal.tsx  # ステータス設定モーダル
 ├── contexts/           # Reactコンテキスト
 │   └── AuthContext.tsx  # 認証状態管理
 ├── utils/              # ユーティリティ関数
@@ -194,7 +209,7 @@ collect-friends-app/
 ├── constants/          # 定数・設定ファイル
 ├── hooks/              # カスタムフック
 ├── assets/             # 画像・フォントなどのアセット
-├── firebaseConfig.js   # Firebase設定
+├── firebaseConfig.ts   # Firebase設定
 └── package.json        # 依存関係・スクリプト
 ```
 
