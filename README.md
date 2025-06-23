@@ -38,6 +38,7 @@
   - Firestore (NoSQLデータベース)
   - Authentication (認証)
   - Cloud Messaging (プッシュ通知)
+  - **Firebase Hosting** (Webアプリケーションホスティング)
 
 ### マップ・位置情報
 - **React Native Maps**: 1.20.1 (ネイティブアプリ用)
@@ -54,6 +55,7 @@
 ### 開発ツール
 - **ESLint**: ^9.25.0
 - **Babel**: ^7.25.2
+- **Firebase CLI**: Firebase Hostingデプロイメント
 
 ## 認証機能
 
@@ -257,3 +259,93 @@ collect-friends-app/
 3. **Firestore エラー**:
    - Firestore セキュリティルールが適切に設定されているか確認
    - ネットワーク接続を確認
+
+## Firebase Hosting デプロイメント
+
+### 1. 前提条件
+- Firebase CLI のインストール
+- Firebase プロジェクトでHostingが有効化されていること
+- Webビルドの動作確認が完了していること
+
+### 2. Firebase CLI のインストール
+```bash
+npm install -g firebase-tools
+firebase --version  # インストール確認
+```
+
+### 3. Firebase プロジェクトの初期化
+```bash
+# Firebaseにログイン
+firebase login
+
+# Hostingの初期化（collect-friends-appディレクトリ内で実行）
+firebase init hosting
+
+# プロジェクト選択時は既存のFirebaseプロジェクトを選択
+# Public directory: web-build
+# Single-page app: Yes
+# Overwrite index.html: No
+```
+
+### 4. Web用ビルドの生成
+```bash
+# Web用の最適化ビルドを生成
+npx expo export:web
+
+# または
+npm run build:web  # カスタムスクリプトがある場合
+```
+
+### 5. Firebase Hostingへのデプロイ
+```bash
+# プレビューデプロイ（テスト用）
+firebase hosting:channel:deploy preview
+
+# 本番デプロイ
+firebase deploy --only hosting
+```
+
+### 6. デプロイ後の確認
+- デプロイ完了後に表示されるURLでアクセス確認
+- HTTPSが有効化されていることを確認
+- カスタムドメインの設定（必要に応じて）
+
+### 設定ファイル (firebase.json)
+```json
+{
+  "hosting": {
+    "public": "web-build",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### その他のコマンド
+```bash
+# リンター実行
+npm run lint
+
+# プロジェクトリセット（初期化）
+npm run reset-project
+```

@@ -8,7 +8,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:web": "npx expo export --platform web",
+    "deploy": "npm run build:web && firebase deploy --only hosting",
+    "deploy:preview": "npm run build:web && firebase hosting:channel:deploy preview"
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
