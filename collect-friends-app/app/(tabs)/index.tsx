@@ -150,7 +150,14 @@ function WebHomeScreen() {
   return (
     <View style={tw`flex-1`}>
       {/* Leafletマップコンポーネント */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <div style={{ 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        zIndex: 1 
+      }}>
         {WebMap && (
           <WebMap
             ref={webMapRef}
@@ -162,7 +169,7 @@ function WebHomeScreen() {
       </div>
 
       {/* ステータス表示バー */}
-      <SafeAreaView style={tw`absolute top-0 left-0 right-0`}>
+      <SafeAreaView style={[tw`absolute top-0 left-0 right-0`, { zIndex: 1000 }]}>
         <View style={tw`mx-4 mt-2 bg-white rounded-full px-4 py-3 flex-row items-center shadow-lg`}>
           <View style={[
             tw`w-3 h-3 rounded-full mr-3`,
@@ -179,7 +186,7 @@ function WebHomeScreen() {
       </SafeAreaView>
 
       {/* フローティングアクションボタン */}
-      <SafeAreaView style={tw`absolute right-0 bottom-0`}>
+      <SafeAreaView style={[tw`absolute right-0 bottom-0`, { zIndex: 1000 }]}>
         <View style={tw`mr-4 mb-20`}>
           <TouchableOpacity
             style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-white mb-3`}
