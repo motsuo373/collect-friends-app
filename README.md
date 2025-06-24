@@ -60,38 +60,10 @@
 ## 認証機能
 
 ### 対応認証方法
-- **Google認証**: Gmail アカウントでのログイン
-- **X(Twitter)認証**: X (旧Twitter) アカウントでのログイン
+- **メールアドレス**: メールでの登録
+- **Google認証**: Gmail アカウントでのログイン (今後実装予定)
+- **X(Twitter)認証**: X (旧Twitter) アカウントでのログイン (今後実装予定)
 - **LINE認証**: LINE アカウントでのログイン (今後実装予定)
-
-### 認証フロー
-1. 未ログイン時に自動的にログイン画面へ遷移
-2. ソーシャルログイン選択
-3. 認証プロバイダーでの認証
-4. Firebase ユーザー作成
-5. Firestore にユーザー情報保存（カスタムUUID含む）
-6. メインアプリ画面への遷移
-
-### ユーザーデータ構造
-```javascript
-{
-  uid: string,                  // Firebase UID
-  customUuid: string,           // アプリ独自のUUID
-  name: string,                 // ユーザー名
-  email: string,                // メールアドレス
-  avatar: string,               // プロフィール画像URL
-  status: {                     // ユーザーステータス
-    current: 'offline' | 'free' | 'busy',
-    mood: string[],
-    availableUntil: Date | null,
-    location: GeoPoint | null,
-    range: number | null,
-  },
-  preferences: object,          // ユーザー設定
-  createdAt: Date,              // 作成日時
-  updatedAt: Date,              // 更新日時
-}
-```
 
 ### 環境変数設定
 認証機能を使用するために以下の環境変数を設定してください：
@@ -174,47 +146,6 @@ npm run lint
 # プロジェクトリセット（初期化）
 npm run reset-project
 ```
-
-### 開発時の確認方法
-
-起動後、以下の方法でアプリを確認できます：
-
-- **Expo Go**: スマートフォンでExpo Goアプリをダウンロードし、QRコードをスキャン
-- **iOS Simulator**: Xcodeに含まれるiOSシミュレーター
-- **Android Emulator**: Android Studioのエミュレーター
-- **Web**: ブラウザでの確認（Leafletベースのマップが表示されます）
-
-#### Web版の特徴
-- **マップ表示**: Leaflet + OpenStreetMapを使用したインタラクティブマップ
-- **位置情報**: Web Geolocation APIで現在地取得
-- **マーカー**: 絵文字ベースのカスタムマーカー表示
-- **移動範囲**: 円形エリアでの移動可能範囲表示
-- **現在地移動**: ボタンクリックでマップ中心を現在地に移動
-
-## プロジェクト構造
-
-```
-collect-friends-app/
-├── app/                 # メイン画面ファイル（Expo Router）
-│   ├── _layout.tsx      # ルートレイアウト・認証管理
-│   └── (tabs)/         # タブナビゲーション
-│       ├── index.tsx    # ホーム（マップ）画面
-│       └── explore.tsx  # プロフィール画面
-├── components/          # 再利用可能コンポーネント
-│   ├── LoginScreen.tsx  # ログイン画面
-│   ├── WebMap.tsx       # Web版マップコンポーネント（Leaflet）
-│   └── StatusModal.tsx  # ステータス設定モーダル
-├── contexts/           # Reactコンテキスト
-│   └── AuthContext.tsx  # 認証状態管理
-├── utils/              # ユーティリティ関数
-│   └── auth.ts         # 認証関連ユーティリティ
-├── constants/          # 定数・設定ファイル
-├── hooks/              # カスタムフック
-├── assets/             # 画像・フォントなどのアセット
-├── firebaseConfig.ts   # Firebase設定
-└── package.json        # 依存関係・スクリプト
-```
-
 ## 使用方法
 
 ### 初回起動時
