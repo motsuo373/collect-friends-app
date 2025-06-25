@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapPin, Users } from 'lucide-react-native';
 
 // Leafletのデフォルトアイコンの修正（React環境での問題解決）
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -79,7 +80,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
   }));
 
   useEffect(() => {
-    // CSS for the map container
+    // CSS for Google Maps style
     const style = document.createElement('style');
     style.textContent = `
       .leaflet-container {
@@ -87,32 +88,73 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
         width: 100%;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         z-index: 1;
+        background-color: #e5e3df;
       }
+      
+      /* Hide zoom controls */
+      .leaflet-control-zoom {
+        display: none !important;
+      }
+      
+      /* Style attribution to match Google Maps */
+      .leaflet-control-attribution {
+        background: rgba(255, 255, 255, 0.7);
+        margin: 0;
+        font-size: 10px;
+        line-height: 14px;
+        color: rgba(0, 0, 0, 0.7);
+      }
+      
+      /* Style popup to match Google Maps */
+      .leaflet-popup-content-wrapper {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        border: none;
+      }
+      
+      .leaflet-popup-tip {
+        background: white;
+        border: none;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      }
+      
       .custom-marker {
-        width: 40px;
-        height: 40px;
+        background: white;
         border-radius: 50%;
-        border: 2px solid white;
+        border: 3px solid;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        font-size: 20px;
-        color: white;
         cursor: pointer;
       }
+      
+      .user-marker {
+        width: 44px;
+        height: 44px;
+        border-color: #4285f4;
+      }
+      
       .nearby-user-marker {
         width: 36px;
         height: 36px;
-        border-radius: 50%;
-        border: 2px solid white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        font-size: 16px;
-        color: white;
-        cursor: pointer;
+        border-color: #ea4335;
+      }
+      
+      .custom-marker svg {
+        width: 20px;
+        height: 20px;
+      }
+      
+      .user-marker svg {
+        width: 24px;
+        height: 24px;
+        color: #4285f4;
+      }
+      
+      .nearby-user-marker svg {
+        color: #ea4335;
       }
     `;
     document.head.appendChild(style);
@@ -126,16 +168,22 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
     ? [userLocation.latitude, userLocation.longitude]
     : [35.6762, 139.6503]; // 東京駅
 
-  // カスタムマーカーアイコンの作成
-  const createCustomIcon = (color: string, isUser = false) => {
-    const className = isUser ? 'custom-marker' : 'nearby-user-marker';
-    const size = isUser ? 40 : 36;
+  // Lucideアイコンを使用したカスタムマーカーアイコンの作成
+  const createCustomIcon = (isUser = false) => {
+    const className = isUser ? 'user-marker' : 'nearby-user-marker';
+    const size = isUser ? 44 : 36;
+    const iconColor = isUser ? '#4285f4' : '#ea4335';
+    
+    // SVGアイコンを作成
+    const iconSvg = isUser 
+      ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`
+      : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m22 21-3-3m0 0a5.5 5.5 0 0 0-7.54-.54 4.91 4.91 0 0 0-1.11 1.11A5.5 5.5 0 0 0 19 18Z"/></svg>`;
     
     return L.divIcon({
       className: 'custom-div-icon',
       html: `
-        <div class="${className}" style="background-color: ${color};">
-          ${isUser ? '👤' : '👥'}
+        <div class="custom-marker ${className}">
+          ${iconSvg}
         </div>
       `,
       iconSize: [size, size],
@@ -168,8 +216,6 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
     return `${(distance / 1000).toFixed(1)}km`;
   };
 
-  const markerColor = userStatus.isAvailable ? '#4CAF50' : '#FF9800';
-
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative', zIndex: 1 }}>
       <MapContainer
@@ -177,10 +223,16 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
         zoom={15}
         style={{ height: '100%', width: '100%', zIndex: 1 }}
         ref={mapRef}
+        zoomControl={false} // ズームコントロールを無効化
+        attributionControl={true}
       >
+        {/* Google Maps風のタイルレイヤー */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          className="google-style-tiles"
+          subdomains="abcd"
+          maxZoom={20}
         />
         
         {/* マップ中心移動コントローラー */}
@@ -191,25 +243,26 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
             {/* ユーザーのマーカー */}
             <Marker
               position={[userLocation.latitude, userLocation.longitude]}
-              icon={createCustomIcon(markerColor, true)}
+              icon={createCustomIcon(true)}
               eventHandlers={{
                 click: onStatusPress,
               }}
             >
               <Popup>
-                <div style={{ textAlign: 'center', minWidth: '150px' }}>
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>あなたの現在地</h3>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>{getStatusText()}</p>
+                <div style={{ textAlign: 'center', minWidth: '150px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '500' }}>あなたの現在地</h3>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#5f6368' }}>{getStatusText()}</p>
                   <button
                     onClick={onStatusPress}
                     style={{
-                      background: '#007AFF',
+                      background: '#1a73e8',
                       color: 'white',
                       border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      fontSize: '14px',
                       cursor: 'pointer',
+                      fontWeight: '500',
                     }}
                   >
                     ステータス変更
@@ -224,8 +277,8 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
                 center={[userLocation.latitude, userLocation.longitude]}
                 radius={userStatus.moveRange}
                 pathOptions={{
-                  fillColor: 'rgba(0, 122, 255, 0.1)',
-                  color: 'rgba(0, 122, 255, 0.3)',
+                  fillColor: 'rgba(66, 133, 244, 0.1)',
+                  color: 'rgba(66, 133, 244, 0.3)',
                   weight: 2,
                 }}
               />
@@ -235,27 +288,25 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
 
         {/* 近くのユーザーのマーカー */}
         {nearbyUsers.map((user) => {
-          const userMarkerColor = user.status.isAvailable ? '#4CAF50' : '#FF9800';
-          
           return (
             <Marker
               key={user.uid}
               position={[user.location.latitude, user.location.longitude]}
-              icon={createCustomIcon(userMarkerColor, false)}
+              icon={createCustomIcon(false)}
               eventHandlers={{
                 click: () => onUserPress?.(user),
               }}
             >
               <Popup>
-                <div style={{ textAlign: 'center', minWidth: '180px' }}>
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{user.name}</h3>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '14px' }}>
+                <div style={{ textAlign: 'center', minWidth: '180px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '500' }}>{user.name}</h3>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#5f6368' }}>
                     {getUserStatusText(user)}
                   </p>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#80868b' }}>
                     距離: {getDistanceText(user.distance)}
                   </p>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#80868b' }}>
                     位置精度: {user.location.accuracy === 'exact' ? '詳細' : 
                               user.location.accuracy === 'approximate' ? '大雑把' : 'エリア'}
                   </p>
@@ -263,13 +314,14 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
                     <button
                       onClick={() => onUserPress(user)}
                       style={{
-                        background: '#4CAF50',
+                        background: '#34a853',
                         color: 'white',
                         border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
+                        padding: '8px 16px',
+                        borderRadius: '4px',
+                        fontSize: '14px',
                         cursor: 'pointer',
+                        fontWeight: '500',
                       }}
                     >
                       話しかける
