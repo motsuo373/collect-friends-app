@@ -47,7 +47,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "このアプリでは、近くの友達を見つけるために位置情報を使用します。"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
