@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { User, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 
 // React Native用のUUID生成関数
@@ -100,12 +101,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      console.log('Signing out...');
+      console.log('Firebase signOut を開始します...');
+      setLoading(true); // ログアウト処理中はローディング状態にする
+      
+      // Firebase認証からサインアウト
       await firebaseSignOut(auth);
+      
+      console.log('Firebase signOut が完了しました');
+      
+      // Web版の場合、追加の処理を実行
+      if (Platform.OS === 'web') {
+        console.log('Web版のログアウト処理を実行します...');
+        
+        // ローカルの状態を強制的にクリア
+        setUser(null);
+        setLoading(false);
+        
+        // ブラウザのセッションストレージもクリア
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.clear();
+          
+          // Firebase関連のlocalStorageを削除
+          const firebaseKeys = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key && key.includes('firebase')) {
+              firebaseKeys.push(key);
+            }
+          }
+          firebaseKeys.forEach(key => window.localStorage.removeItem(key));
+          
+          console.log('Web版ログアウト：ストレージをクリアしました');
+          
+          // 強制的にページをリロードしてすべての状態をリセット
+          setTimeout(() => {
+            console.log('Web版ログアウト：ページをリロードします');
+            window.location.reload();
+          }, 200);
+        }
+      }
+      
+      // ユーザー状態は onAuthStateChanged で自動的に null に設定される
+      // ただし、Web版では上記で明示的に設定済み
+      
     } catch (error) {
-      console.error('サインアウトエラー:', error);
+      console.error('Firebase signOut エラー:', error);
+      
+      // Web版でFirebaseのサインアウトに失敗した場合の代替処理
+      if (Platform.OS === 'web') {
+        console.log('Web版：Firebase signOut失敗時の代替処理を実行');
+        
+        // 強制的にローカル状態をクリア
+        setUser(null);
+        setLoading(false);
+        
+        if (typeof window !== 'undefined') {
+          // すべてのストレージをクリア
+          window.sessionStorage.clear();
+          window.localStorage.clear();
+          
+          // ページをリロードして完全にリセット
+          setTimeout(() => {
+            window.location.reload();
+          }, 100);
+        }
+        
+        // エラーを投げずに正常終了とする（代替処理で対応済み）
+        return;
+      }
+      
+      // エラーが発生した場合はローディング状態をリセット
+      setLoading(false);
+      
+      // エラーを上位に再投げ
       throw error;
     }
+    // 成功時のloadingリセットは onAuthStateChanged または Web版では上記で行われる
   };
 
   const value = {
