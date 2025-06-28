@@ -2,8 +2,7 @@
 
 ## 概要
 
-- **Firestore**: メインデータベース（ユーザー情報、チャット、イベントなど）
-- **Realtime Database**: リアルタイムデータ（位置情報、ステータスなど）
+- **Firestore**: メインデータベース（ユーザー情報、チャット、イベント、位置情報など）
 - **Cloud Storage**: 画像・メディアファイル
 
 ---
@@ -28,6 +27,12 @@
 | privacySettings | object | プライバシー設定（デフォルト位置共有レベルなど） |
 | preferences | object | AI学習用データ（興味、予算、時間帯など） |
 | stats | object | 統計データ（参加回数、評価など） |
+| currentStatus | string | 現在のステータス ('free', 'busy', 'offline') |
+| mood | array | やりたいこと (['drinking', 'cafe']など) |
+| availableUntil | timestamp | 暇でいられる時間 |
+| customMessage | string | カスタムステータスメッセージ |
+| isOnline | boolean | オンライン状況 |
+| lastActive | timestamp | 最終アクティブ時間 |
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 更新日時 |
 
@@ -48,6 +53,23 @@
 | acceptedAt | timestamp | 承認日時 |
 | interactionHistory | object | 交流履歴（過去の集まり回数など） |
 
+### locations
+```
+ドキュメントID: {uid}
+```
+
+| フィールド | 型 | 説明 |
+|-----------|---|------|
+| uid | string | ユーザーUID |
+| coordinates | object | 座標情報 {lat: number, lng: number} |
+| geohash | string | Geohash（近隣検索用） |
+| address | string | 住所（任意） |
+| lastUpdate | timestamp | 最終更新時間 |
+| isSharing | boolean | 位置共有が有効かどうか |
+| sharingSettings | map | 各友人への共有設定 {[friendUid]: {level: number, maskedCoordinates?: object}} |
+| locationHistory | array | 位置履歴（直近10件） |
+| expiresAt | timestamp | 位置情報の有効期限（任意） |
+
 ### chats
 ```
 ドキュメントID: {chatId}
@@ -62,6 +84,8 @@
 | eventRef | reference | 関連イベント参照（任意） |
 | aiAssistEnabled | boolean | AI支援機能有効化 |
 | lastMessage | object | 最後のメッセージ情報 |
+| activeUsers | array | 現在アクティブなユーザーリスト |
+| typingUsers | map | 入力中ユーザー {[uid]: timestamp} |
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 更新日時 |
 
@@ -80,6 +104,8 @@
 | aiGenerated | boolean | AI生成メッセージかどうか |
 | reactions | array | リアクション情報 |
 | timestamp | timestamp | 送信日時 |
+| editedAt | timestamp | 編集日時（任意） |
+| isRead | map | 既読状況 {[uid]: timestamp} |
 
 ### events
 ```
@@ -116,9 +142,11 @@
 | description | string | 店舗説明 |
 | category | string | カテゴリー ('restaurant', 'cafe', 'bar') |
 | address | object | 住所・位置情報 |
+| coordinates | object | 座標情報 {lat: number, lng: number} |
+| geohash | string | Geohash（近隣検索用） |
 | businessHours | array | 営業時間 |
 | contact | object | 連絡先情報 |
-| currentStatus | object | リアルタイム営業状況 |
+| currentStatus | object | 現在の営業状況 |
 | capacity | number | 最大収容人数 |
 | averageBudget | object | 平均予算 |
 | features | array | 店舗特徴 (['wifi', 'parking'など) |
@@ -141,7 +169,8 @@
 | proposal | object | 提案内容（タイトル、説明、場所、時間） |
 | aiAnalysis | object | AI分析データ（信頼度、推薦理由） |
 | responses | array | ユーザー応答リスト |
-| status | string | 提案状態 ('active', 'processed', 'expired') |
+| status | string | 提案状態 ('active', 'processing', 'processed', 'expired') |
+| progress | number | 処理進捗率（0-100） |
 | expiresAt | timestamp | 有効期限 |
 | createdAt | timestamp | 作成日時 |
 
@@ -164,74 +193,6 @@
 
 ---
 
-## Realtime Database 構造
-
-### user_status (リアルタイムユーザーステータス)
-```json
-{
-  "user_status": {
-    "{uid}": {
-      "status": "free",           // ステータス: free, busy, offline
-      "mood": ["drinking", "cafe"], // やりたいこと
-      "availableUntil": 1703980800000, // 暇でいられる時間（タイムスタンプ）
-      "lastUpdate": 1703977200000,     // 最終更新時間
-      "customMessage": "今夜飲みに行きたい！" // カスタムメッセージ
-    }
-  }
-}
-```
-
-### location_data (位置情報)
-```json
-{
-  "location_data": {
-    "{uid}": {
-      "coordinates": {
-        "lat": 35.6762,           // 緯度
-        "lng": 139.6503           // 経度
-      },
-      "accuracy": 10,             // 精度（メートル）
-      "lastUpdate": 1703977200000, // 最終更新時間
-      "sharing": {                // 共有設定
-        "{friendUid}": {
-          "level": 2,             // 共有レベル (1:詳細, 2:大雑把, 3:非表示, 4:ブロック)
-          "maskedCoordinates": {  // マスキングされた座標
-            "lat": 35.676,
-            "lng": 139.650
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### active_sessions (アクティブセッション)
-```json
-{
-  "active_sessions": {
-    "chats": {
-      "{chatId}": {
-        "activeUsers": ["{uid1}", "{uid2}"], // アクティブユーザー
-        "typingUsers": {                     // 入力中ユーザー
-          "{uid1}": 1703977200000
-        },
-        "lastActivity": 1703977200000        // 最終活動時間
-      }
-    },
-    "ai_processing": {
-      "{proposalId}": {
-        "status": "processing",              // 処理状態: processing, completed, failed
-        "progress": 75,                      // 進捗率
-        "startedAt": 1703977200000           // 開始時間
-      }
-    }
-  }
-}
-```
-
----
-
 ## 位置情報共有レベル
 
 | レベル | 名称 | 説明 |
@@ -239,4 +200,14 @@
 | 1 | 詳細位置 | リアルタイム正確位置（恋人・家族向け） |
 | 2 | 大雑把位置 | エリア位置のみ（友人向け） |
 | 3 | 非表示 | 位置情報非表示、オンライン状況のみ |
-| 4 | ブロック | 全情報非表示 | 
+| 4 | ブロック | 全情報非表示 |
+
+---
+
+## Geohash活用
+
+位置情報の効率的な検索のため、`locations`および`stores`コレクションではGeohashを使用します：
+
+- **精度レベル**: 6文字（約1.2km四方）を基本とし、用途に応じて調整
+- **近隣検索**: Geohashの前方一致検索で効率的な位置ベースクエリを実現
+- **プライバシー**: 共有レベルに応じてGeohashの精度を調整 

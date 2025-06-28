@@ -13,6 +13,7 @@ import { StatusModal, UserStatus } from '@/components/StatusModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
+import { LocationService } from '@/utils/locationService';
 import MapView, { Marker, Circle } from 'react-native-maps';
 import tw from 'twrnc';
 
@@ -41,6 +42,7 @@ export default function NativeMapScreen() {
   const [statusModalVisible, setStatusModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const mapRef = useRef<MapView>(null);
+  const locationService = LocationService.getInstance();
 
   useEffect(() => {
     requestLocationPermission();
@@ -85,6 +87,19 @@ export default function NativeMapScreen() {
 
       setUserLocation(newLocation);
       
+      // Firestoreに位置情報を保存
+      const locationData = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy || 0,
+        timestamp: Date.now()
+      };
+      
+      const saveSuccess = await locationService.saveLocationToFirestore(locationData, true);
+      if (!saveSuccess) {
+        console.error('位置情報のFirestore保存に失敗しました');
+      }
+      
       if (mapRef.current) {
         mapRef.current.animateToRegion({
           ...newLocation,
@@ -112,13 +127,44 @@ export default function NativeMapScreen() {
     );
   };
 
-  const handleMyLocationPress = () => {
-    if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion({
-        ...userLocation,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 1000);
+  const handleMyLocationPress = async () => {
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const newLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setUserLocation(newLocation);
+      
+      // Firestoreに位置情報を保存
+      const locationData = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy || 0,
+        timestamp: Date.now()
+      };
+      
+      const saveSuccess = await locationService.saveLocationToFirestore(locationData, true);
+      if (saveSuccess) {
+        Alert.alert('位置更新', '現在地がFirestoreに保存されました。');
+      } else {
+        Alert.alert('エラー', '位置情報の保存に失敗しました。');
+      }
+
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          ...newLocation,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('現在地取得エラー:', error);
+      Alert.alert('エラー', '現在地の取得に失敗しました。');
     }
   };
 

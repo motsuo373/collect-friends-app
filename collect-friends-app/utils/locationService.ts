@@ -1,7 +1,14 @@
 import * as Location from 'expo-location';
 import { getAuth } from 'firebase/auth';
-
-// 位置情報データ型
+import * as geohash from 'ngeohash';
+import { 
+  setDocument, 
+  getDocument, 
+  updateDocument, 
+  deleteDocument, 
+  getCollectionWithQuery,
+  firestoreQueries 
+} from './firestoreService';
 export interface LocationData {
   latitude: number;
   longitude: number;
@@ -30,14 +37,42 @@ export interface NearbyUser {
   sharingLevel: number;
 }
 
-// API基本URL（本番のCloud Functionsを使用）
-const API_BASE_URL = 'https://asia-northeast1-collect-friends-app.cloudfunctions.net';
+export enum LocationSharingLevel {
+  DETAILED = 1,
+  APPROXIMATE = 2,
+  HIDDEN = 3,
+  BLOCKED = 4
+}
+
+// Firestore用の位置情報データ型
+export interface FirestoreLocationData {
+  uid: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  geohash: string;
+  address?: string;
+  lastUpdate: Date;
+  isSharing: boolean;
+  sharingSettings: { [friendUid: string]: { level: number; maskedCoordinates?: { lat: number; lng: number } } };
+  locationHistory: { coordinates: { lat: number; lng: number }; timestamp: Date }[];
+  expiresAt?: Date;
+}
+
+export interface LocationHistoryEntry {
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  timestamp: Date;
+}
 
 export class LocationService {
   private static instance: LocationService;
   private currentLocation: LocationData | null = null;
-  private updateInterval: number | null = null;
-  private readonly UPDATE_INTERVAL = 30000; // 30秒間隔
+  private updateInterval: any = null;
+  private readonly UPDATE_INTERVAL = 60000;
 
   private constructor() {}
 
@@ -56,7 +91,6 @@ export class LocationService {
       let { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('位置情報の使用が許可されませんでした');
         return false;
       }
 
@@ -93,11 +127,29 @@ export class LocationService {
   }
 
   /**
-   * 位置情報とステータスをサーバーに更新
+   * Geohashを生成する
    */
-  async updateLocationAndStatus(
+  private generateGeohash(lat: number, lng: number, precision: number = 6): string {
+    return geohash.encode(lat, lng, precision);
+  }
+
+  /**
+   * 位置履歴エントリを作成
+   */
+  private createLocationHistoryEntry(coordinates: { lat: number; lng: number }): LocationHistoryEntry {
+    return {
+      coordinates,
+      timestamp: new Date()
+    };
+  }
+
+  /**
+   * 位置情報をFirestoreに保存
+   */
+  async saveLocationToFirestore(
     location: LocationData, 
-    userStatus: UserStatus
+    isSharing: boolean = true,
+    sharingSettings: { [friendUid: string]: { level: number; maskedCoordinates?: { lat: number; lng: number } } } = {}
   ): Promise<boolean> {
     try {
       const auth = getAuth();
@@ -108,97 +160,214 @@ export class LocationService {
         return false;
       }
 
-      const idToken = await user.getIdToken();
+      const coordinates = {
+        lat: location.latitude,
+        lng: location.longitude
+      };
 
-      const response = await fetch(`${API_BASE_URL}/updateLocation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          location,
-          isOnline: userStatus.isOnline,
-          status: userStatus.status,
-          mood: userStatus.mood,
-          availableUntil: userStatus.availableUntil,
-          customMessage: userStatus.customMessage
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('位置情報更新エラー:', errorData);
-        return false;
-      }
-
-      const result = await response.json();
-      console.log('位置情報更新成功:', result);
+      await this.saveLocationData(user.uid, coordinates, isSharing, sharingSettings);
       return true;
 
     } catch (error) {
-      console.error('位置情報更新エラー:', error);
+      console.error('位置情報保存エラー:', error);
       return false;
     }
   }
 
   /**
-   * 近隣ユーザーを検索
+   * 位置情報を保存する（内部関数）
    */
-  async searchNearbyUsers(location: LocationData, radius: number = 5000): Promise<NearbyUser[]> {
+  private async saveLocationData(
+    uid: string,
+    coordinates: { lat: number; lng: number },
+    isSharing: boolean = true,
+    sharingSettings: { [friendUid: string]: { level: number; maskedCoordinates?: { lat: number; lng: number } } } = {},
+    address?: string,
+    expiresAt?: Date
+  ): Promise<void> {
+    try {
+      const existingLocation = await getDocument(`locations/${uid}`);
+      
+      const newHistoryEntry = this.createLocationHistoryEntry(coordinates);
+      
+      let locationHistory: LocationHistoryEntry[] = [];
+      if (existingLocation?.locationHistory) {
+        locationHistory = [...existingLocation.locationHistory];
+      }
+      locationHistory.unshift(newHistoryEntry);
+      locationHistory = locationHistory.slice(0, 10);
+
+      const geohashValue = this.generateGeohash(coordinates.lat, coordinates.lng);
+
+      const locationData: Partial<FirestoreLocationData> = {
+        uid,
+        coordinates,
+        geohash: geohashValue,
+        lastUpdate: new Date(),
+        isSharing,
+        sharingSettings,
+        locationHistory,
+        ...(address && { address }),
+        ...(expiresAt && { expiresAt })
+      };
+
+      await setDocument(`locations/${uid}`, locationData, true);
+      
+    } catch (error) {
+      console.error('位置情報保存エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ユーザーの現在の位置情報を取得
+   */
+  async getUserLocationFromFirestore(uid: string): Promise<LocationData | null> {
+    try {
+      const locationData = await this.getLocationData(uid);
+      
+      if (!locationData) {
+        return null;
+      }
+
+      return {
+        latitude: locationData.coordinates.lat,
+        longitude: locationData.coordinates.lng,
+        timestamp: locationData.lastUpdate.getTime()
+      };
+
+    } catch (error) {
+      console.error('位置情報取得エラー:', error);
+      return null;
+    }
+  }
+
+  /**
+   * ユーザーの位置情報を取得する（内部関数）
+   */
+  private async getLocationData(uid: string): Promise<FirestoreLocationData | null> {
+    try {
+      const locationDoc = await getDocument(`locations/${uid}`);
+      return locationDoc as FirestoreLocationData | null;
+    } catch (error) {
+      console.error('位置情報取得エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 位置共有設定を更新
+   */
+  async updateSharingSettings(
+    friendUid: string, 
+    level: LocationSharingLevel,
+    maskedCoordinates?: { lat: number; lng: number }
+  ): Promise<boolean> {
     try {
       const auth = getAuth();
       const user = auth.currentUser;
       
       if (!user) {
         console.error('ユーザーが認証されていません');
-        return [];
+        return false;
       }
 
-      const idToken = await user.getIdToken();
-
-      const response = await fetch(`${API_BASE_URL}/searchNearbyUsers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          location,
-          radius
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('近隣ユーザー検索エラー:', errorData);
-        return [];
-      }
-
-      const result = await response.json();
-      return result.users || [];
+      await this.updateLocationSharingSettings(user.uid, friendUid, level, maskedCoordinates);
+      return true;
 
     } catch (error) {
-      console.error('近隣ユーザー検索エラー:', error);
-      return [];
+      console.error('位置共有設定更新エラー:', error);
+      return false;
     }
   }
 
   /**
-   * 定期的な位置情報更新を開始
+   * 位置共有設定を更新する（内部関数）
    */
-  startPeriodicUpdates(userStatus: UserStatus): void {
-    // 既存のタイマーがあれば停止
-    this.stopPeriodicUpdates();
+  private async updateLocationSharingSettings(
+    uid: string,
+    friendUid: string,
+    level: number,
+    maskedCoordinates?: { lat: number; lng: number }
+  ): Promise<void> {
+    try {
+      const updateData = {
+        [`sharingSettings.${friendUid}`]: {
+          level,
+          ...(maskedCoordinates && { maskedCoordinates })
+        }
+      };
 
+      await updateDocument(`locations/${uid}`, updateData);
+    } catch (error) {
+      console.error('位置共有設定更新エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 近隣の位置情報を検索する
+   */
+  async findNearbyLocations(
+    centerGeohash: string,
+    precision: number = 6
+  ): Promise<FirestoreLocationData[]> {
+    try {
+      const geohashPrefix = centerGeohash.substring(0, precision);
+      
+      const nearbyLocations = await getCollectionWithQuery('locations', [
+        firestoreQueries.where('geohash', '>=', geohashPrefix),
+        firestoreQueries.where('geohash', '<', geohashPrefix + '\uf8ff'),
+        firestoreQueries.where('isSharing', '==', true),
+        firestoreQueries.orderBy('geohash'),
+        firestoreQueries.limit(50)
+      ]);
+
+      return nearbyLocations as FirestoreLocationData[];
+    } catch (error) {
+      console.error('近隣位置情報検索エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 位置情報の有効期限をチェックして期限切れのものを削除
+   */
+  async cleanupExpiredLocation(uid: string): Promise<void> {
+    try {
+      const locationData = await this.getLocationData(uid);
+      
+      if (locationData?.expiresAt && new Date() > locationData.expiresAt) {
+        await deleteDocument(`locations/${uid}`);
+      }
+    } catch (error) {
+      console.error('位置情報クリーンアップエラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 定期的な位置情報更新を開始（1分間隔）
+   */
+  startPeriodicUpdates(isSharing: boolean = true): void {
+    this.stopPeriodicUpdates();
+    
     this.updateInterval = setInterval(async () => {
-      const location = await this.getCurrentLocation();
-      if (location) {
-        await this.updateLocationAndStatus(location, userStatus);
+      try {
+        const location = await this.getCurrentLocation();
+        if (location) {
+          await this.saveLocationToFirestore(location, isSharing);
+        }
+      } catch (error) {
+        console.error('定期位置情報更新エラー:', error);
       }
     }, this.UPDATE_INTERVAL);
 
-    console.log('定期的な位置情報更新を開始しました（30秒間隔）');
+    this.getCurrentLocation().then(location => {
+      if (location) {
+        this.saveLocationToFirestore(location, isSharing);
+      }
+    });
   }
 
   /**
@@ -208,7 +377,6 @@ export class LocationService {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
-      console.log('定期的な位置情報更新を停止しました');
     }
   }
 
@@ -227,20 +395,19 @@ export class LocationService {
       return true;
     }
 
-    // 約100メートル以上移動した場合に更新
     const distance = this.calculateDistance(
       this.currentLocation,
       newLocation
     );
 
-    return distance > 100; // 100メートル
+    return distance > 100;
   }
 
   /**
    * 2点間の距離を計算（メートル）
    */
   private calculateDistance(point1: LocationData, point2: LocationData): number {
-    const R = 6371e3; // 地球の半径（メートル）
+    const R = 6371e3;
     const φ1 = point1.latitude * Math.PI / 180;
     const φ2 = point2.latitude * Math.PI / 180;
     const Δφ = (point2.latitude - point1.latitude) * Math.PI / 180;
@@ -251,7 +418,7 @@ export class LocationService {
               Math.sin(Δλ/2) * Math.sin(Δλ/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-    return R * c; // メートル
+    return R * c;
   }
 
   /**
@@ -261,4 +428,6 @@ export class LocationService {
     this.stopPeriodicUpdates();
     this.currentLocation = null;
   }
-} 
+}
+
+ 

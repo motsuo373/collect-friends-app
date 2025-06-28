@@ -51,7 +51,6 @@ export const setDocument = async (
     const { collectionPath, docId } = parsePath(path);
     const docRef = doc(db, collectionPath, docId);
     
-    // タイムスタンプを自動追加
     const dataWithTimestamp = {
       ...data,
       updatedAt: serverTimestamp(),
@@ -59,7 +58,6 @@ export const setDocument = async (
     };
     
     await setDoc(docRef, dataWithTimestamp, { merge });
-    console.log(`ドキュメントを保存しました: ${path}`);
   } catch (error) {
     console.error(`ドキュメント保存エラー (${path}):`, error);
     throw error;
@@ -80,7 +78,6 @@ export const getDocument = async (path: string): Promise<DocumentData | null> =>
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() };
     } else {
-      console.log(`ドキュメントが存在しません: ${path}`);
       return null;
     }
   } catch (error) {
@@ -103,14 +100,12 @@ export const updateDocument = async (
     const { collectionPath, docId } = parsePath(path);
     const docRef = doc(db, collectionPath, docId);
     
-    // タイムスタンプを自動追加
     const dataWithTimestamp = {
       ...data,
       updatedAt: serverTimestamp()
     };
     
     await updateDoc(docRef, dataWithTimestamp);
-    console.log(`ドキュメントを更新しました: ${path}`);
   } catch (error) {
     console.error(`ドキュメント更新エラー (${path}):`, error);
     throw error;
@@ -128,7 +123,6 @@ export const deleteDocument = async (path: string): Promise<void> => {
     const docRef = doc(db, collectionPath, docId);
     
     await deleteDoc(docRef);
-    console.log(`ドキュメントを削除しました: ${path}`);
   } catch (error) {
     console.error(`ドキュメント削除エラー (${path}):`, error);
     throw error;
@@ -197,7 +191,6 @@ export const addDocument = async (
   try {
     const colRef = collection(db, collectionPath);
     
-    // タイムスタンプを自動追加
     const dataWithTimestamp = {
       ...data,
       createdAt: serverTimestamp(),
@@ -205,7 +198,6 @@ export const addDocument = async (
     };
     
     const docRef = await addDoc(colRef, dataWithTimestamp);
-    console.log(`新しいドキュメントを追加しました: ${colRef.path}/${docRef.id}`);
     return docRef.id;
   } catch (error) {
     console.error(`ドキュメント追加エラー (${collectionPath}):`, error);
@@ -213,14 +205,12 @@ export const addDocument = async (
   }
 };
 
-// よく使用されるクエリのヘルパー関数
 export const firestoreQueries = {
   where,
   orderBy,
   limit
 };
 
-// エクスポートされた関数のまとめ
 export const firestoreService = {
   setDocument,
   getDocument,

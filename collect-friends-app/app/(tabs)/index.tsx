@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { setDocument, getDocument, updateDocument } from '@/utils/firestoreService';
+import { LocationService } from '@/utils/locationService';
 import tw from 'twrnc';
 
 // Dynamic import for web only
@@ -90,6 +91,7 @@ function WebHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [webMapLoaded, setWebMapLoaded] = useState(false);
   const webMapRef = useRef<any>(null);
+  const locationService = LocationService.getInstance();
 
   // Web用マップコンポーネントの動的読み込み
   useEffect(() => {
@@ -172,13 +174,27 @@ function WebHomeScreen() {
       // Web環境では位置情報APIを直接使用
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
+          async (position) => {
             const newLocation = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
             };
             setUserLocation(newLocation);
             setLocationPermissionGranted(true);
+            
+            // Firestoreに位置情報を保存
+            const locationData = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy || 0,
+              timestamp: Date.now()
+            };
+            
+            const saveSuccess = await locationService.saveLocationToFirestore(locationData, true);
+            if (!saveSuccess) {
+              console.error('位置情報のFirestore保存に失敗しました');
+            }
+            
             setLoading(false);
           },
           (error) => {
@@ -195,6 +211,51 @@ function WebHomeScreen() {
       console.error('位置情報の許可取得エラー:', error);
       Alert.alert('エラー', '位置情報の許可取得に失敗しました。');
       setLoading(false);
+    }
+  };
+
+  const handleMyLocationPress = async () => {
+    try {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const newLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            };
+            setUserLocation(newLocation);
+            
+            // Firestoreに位置情報を保存
+            const locationData = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy || 0,
+              timestamp: Date.now()
+            };
+            
+            const saveSuccess = await locationService.saveLocationToFirestore(locationData, true);
+            if (saveSuccess) {
+              Alert.alert('位置更新', '現在地がFirestoreに保存されました。');
+            } else {
+              Alert.alert('エラー', '位置情報の保存に失敗しました。');
+            }
+
+            // 地図の位置も更新
+            if (webMapRef.current?.moveToLocation) {
+              webMapRef.current.moveToLocation(newLocation);
+            }
+          },
+          (error) => {
+            console.error('Web位置情報エラー:', error);
+            Alert.alert('エラー', '現在地の取得に失敗しました。');
+          }
+        );
+      } else {
+        Alert.alert('エラー', 'このブラウザは位置情報をサポートしていません。');
+      }
+    } catch (error) {
+      console.error('現在地取得エラー:', error);
+      Alert.alert('エラー', '現在地の取得に失敗しました。');
     }
   };
 
@@ -321,11 +382,7 @@ function WebHomeScreen() {
         <View style={tw`mr-4 mb-20`}>
           <TouchableOpacity
             style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-white mb-3`}
-            onPress={() => {
-              if (userLocation && webMapRef.current?.moveToLocation) {
-                webMapRef.current.moveToLocation(userLocation);
-              }
-            }}
+            onPress={handleMyLocationPress}
           >
             <Ionicons name="locate" size={24} color="#007AFF" />
           </TouchableOpacity>
