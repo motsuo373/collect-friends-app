@@ -121,3 +121,8 @@ class StationSearchResult(BaseModel):
     longitude: float
     lines: List[str]
     is_major_city_station: bool = False
+    # Google Places APIから取得した追加情報
+    formatted_address: Optional[str] = None
+    place_id: Optional[str] = None
+    business_status: Optional[str] = None
+    place_types: List[str] = []

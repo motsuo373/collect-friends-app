@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-from typing import List
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from datetime import datetime
 
@@ -11,7 +11,8 @@ from app.models import (
     Recommendation,
     ResearchMetadata,
     StationInfo,
-    ActivityCategory
+    ActivityCategory,
+    LocationData
 )
 from app.services.station_search import StationSearchEngine
 from app.services.gemini_research import GeminiResearchAgent, GeminiAPIError
@@ -19,6 +20,29 @@ from app.config import get_settings
 
 
 router = APIRouter(prefix="/api/v1", tags=["recommendations"])
+
+
+@router.get("/debug/station-search-status")
+async def get_station_search_status():
+    """駅検索サービスの状態をデバッグ用に確認"""
+    try:
+        station_search = StationSearchEngine()
+        status = station_search.get_service_status()
+        
+        # テスト実行
+        test_location = LocationData(latitude=35.6762, longitude=139.6503)
+        test_results = await station_search.test_station_search(test_location)
+        
+        return {
+            "service_status": status,
+            "test_results": test_results,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 class RecommendationService:

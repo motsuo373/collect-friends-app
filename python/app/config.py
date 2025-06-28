@@ -29,8 +29,6 @@ class Settings:
     
     # 外部API
     GOOGLE_PLACES_API_KEY: str = os.getenv("GOOGLE_PLACES_API_KEY", "")
-    GURUNAVI_ACCESS_KEY: str = os.getenv("GURUNAVI_ACCESS_KEY", "")
-    TABELOG_API_KEY: str = os.getenv("TABELOG_API_KEY", "")
     
     # Redis設定
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")

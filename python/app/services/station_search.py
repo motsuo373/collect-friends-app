@@ -1,10 +1,9 @@
-import math
-import random
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict, Any
 from geopy.distance import geodesic
 
 from app.models import LocationData, StationSearchResult
 from app.config import get_settings
+from app.services.google_places import GooglePlacesService, GooglePlacesAPIError
 
 
 class StationSearchEngine:
@@ -12,8 +11,17 @@ class StationSearchEngine:
     
     def __init__(self):
         self.settings = get_settings()
-        # 実際の実装では、駅データベースを使用
-        # ここでは簡略化のため、主要駅の座標をハードコード
+        
+        # Google Places API サービスの初期化
+        try:
+            self.places_service = GooglePlacesService()
+            self.use_google_places = True
+        except Exception as e:
+            print(f"Google Places API initialization failed: {e}")
+            self.places_service = None
+            self.use_google_places = False
+        
+        # フォールバック用のハードコードされた駅データベース
         self.station_database = {
             # 関東
             "新宿": {"lat": 35.6896, "lng": 139.7006, "lines": ["JR山手線", "JR中央線", "小田急線", "京王線", "東京メトロ丸ノ内線"]},
@@ -49,12 +57,50 @@ class StationSearchEngine:
         }
     
     async def search_nearby_stations(
-        self, 
-        user_location: LocationData, 
+        self,
+        user_location: LocationData,
         radius_km: float,
         max_stations: int
     ) -> List[StationSearchResult]:
         """ユーザーの位置から近い駅を検索"""
+        
+        # Google Places APIが利用可能な場合は、それを使用
+        if self.use_google_places and self.places_service:
+            try:
+                print(f"🔄 Attempting Google Places API search for location: {user_location.latitude}, {user_location.longitude}")
+                
+                # kmをメートルに変換
+                radius_m = int(radius_km * 1000)
+                print(f"🔄 Search radius: {radius_m}m, max_stations: {max_stations}")
+                
+                # Google Places APIで検索
+                stations = await self.places_service.search_nearby_stations(
+                    user_location=user_location,
+                    radius_m=radius_m,
+                    max_results=max_stations
+                )
+                
+                print(f"✅ Google Places API returned {len(stations)} stations")
+                if stations:
+                    print(f"🏢 First station: {stations[0].station_name}")
+                return stations
+                
+            except GooglePlacesAPIError as e:
+                print(f"🚨 Google Places API error, falling back to local database: {e}")
+                print(f"🔍 Error details: {type(e).__name__} - {str(e)}")
+                # エラーの場合はフォールバック処理を実行
+        
+        # フォールバック：ハードコードされた駅データベースを使用
+        print("Using fallback station database")
+        return await self._search_nearby_stations_fallback(user_location, radius_km, max_stations)
+    
+    async def _search_nearby_stations_fallback(
+        self,
+        user_location: LocationData,
+        radius_km: float,
+        max_stations: int
+    ) -> List[StationSearchResult]:
+        """フォールバック用の近隣駅検索（ハードコードデータベース使用）"""
         nearby_stations = []
         user_coords = (user_location.latitude, user_location.longitude)
         
@@ -70,7 +116,11 @@ class StationSearchEngine:
                         latitude=station_info["lat"],
                         longitude=station_info["lng"],
                         lines=station_info["lines"],
-                        is_major_city_station=station_name in self.settings.all_major_cities
+                        is_major_city_station=station_name in self.settings.all_major_cities,
+                        formatted_address=f"{station_name}駅周辺",
+                        place_id="fallback_" + station_name,
+                        business_status="OPERATIONAL",
+                        place_types=["train_station"]
                     )
                 )
         
@@ -162,3 +212,69 @@ class StationSearchEngine:
         all_stations = nearby_stations + major_stations
         
         return all_stations
+    
+    def get_service_status(self) -> Dict[str, Any]:
+        """サービスの状態を取得"""
+        status = {
+            "google_places_api": {
+                "enabled": self.use_google_places,
+                "service_available": self.places_service is not None
+            },
+            "fallback_database": {
+                "station_count": len(self.station_database),
+                "major_cities": len(self.settings.all_major_cities)
+            }
+        }
+        
+        if self.places_service:
+            try:
+                # API キー検証は非同期なので、ここでは簡単なチェックのみ
+                status["google_places_api"]["api_key_configured"] = bool(self.settings.GOOGLE_PLACES_API_KEY and
+                                                                        self.settings.GOOGLE_PLACES_API_KEY != "your_google_places_key")
+            except Exception as e:
+                status["google_places_api"]["api_key_configured"] = False
+                status["google_places_api"]["error"] = str(e)
+        
+        return status
+    
+    async def test_station_search(self, test_location: Optional[LocationData] = None) -> Dict[str, Any]:
+        """駅検索機能のテスト"""
+        if test_location is None:
+            # 東京駅をデフォルトテスト位置として使用
+            test_location = LocationData(latitude=35.6812, longitude=139.7671)
+        
+        results = {
+            "test_location": {
+                "latitude": test_location.latitude,
+                "longitude": test_location.longitude
+            }
+        }
+        
+        try:
+            # 近隣駅検索テスト
+            stations = await self.search_nearby_stations(
+                user_location=test_location,
+                radius_km=2.0,
+                max_stations=5
+            )
+            
+            results["nearby_search"] = {
+                "success": True,
+                "station_count": len(stations),
+                "stations": [
+                    {
+                        "name": s.station_name,
+                        "distance_km": s.distance_km,
+                        "api_source": "google_places" if s.place_id and not s.place_id.startswith("fallback_") else "fallback"
+                    }
+                    for s in stations[:3]  # 最初の3駅のみ表示
+                ]
+            }
+            
+        except Exception as e:
+            results["nearby_search"] = {
+                "success": False,
+                "error": str(e)
+            }
+        
+        return results
