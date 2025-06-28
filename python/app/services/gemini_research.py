@@ -42,8 +42,8 @@ class GeminiResearchAgent:
             # 旧Gemini API
             import google.generativeai as genai
             genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel('gemini-pro')
-            print("Using legacy Gemini API")
+            self.model = genai.GenerativeModel(self.settings.GEMINI_MODEL)
+            print(f"Using legacy Gemini API with model: {self.settings.GEMINI_MODEL}")
     
     async def research_station_activities(
         self,
