@@ -95,74 +95,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      setLoading(true); // ログアウト処理中はローディング状態にする
-      
       // Firebase認証からサインアウト
       await firebaseSignOut(auth);
       
-      // Web版の場合、追加の処理を実行
-      if (Platform.OS === 'web') {
-        // ローカルの状態を強制的にクリア
-        setUser(null);
-        setLoading(false);
-        
-        // ブラウザのセッションストレージもクリア
-        if (typeof window !== 'undefined') {
-          window.sessionStorage.clear();
-          
-          // Firebase関連のlocalStorageを削除
-          const firebaseKeys = [];
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (key && key.includes('firebase')) {
-              firebaseKeys.push(key);
-            }
-          }
-          firebaseKeys.forEach(key => window.localStorage.removeItem(key));
-          
-          // 強制的にページをリロードしてすべての状態をリセット
-          setTimeout(() => {
-            window.location.reload();
-          }, 200);
-        }
+      // Web版の場合、セッションストレージをクリア
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.sessionStorage.clear();
       }
       
       // ユーザー状態は onAuthStateChanged で自動的に null に設定される
-      // ただし、Web版では上記で明示的に設定済み
       
     } catch (error) {
       console.error('Firebase signOut エラー:', error);
       
-      // Web版でFirebaseのサインアウトに失敗した場合の代替処理
-      if (Platform.OS === 'web') {
-        console.log('Web版：Firebase signOut失敗時の代替処理を実行');
-        
-        // 強制的にローカル状態をクリア
-        setUser(null);
-        setLoading(false);
-        
-        if (typeof window !== 'undefined') {
-          // すべてのストレージをクリア
-          window.sessionStorage.clear();
-          window.localStorage.clear();
-          
-          // ページをリロードして完全にリセット
-          setTimeout(() => {
-            window.location.reload();
-          }, 100);
-        }
-        
-        // エラーを投げずに正常終了とする（代替処理で対応済み）
-        return;
-      }
-      
-      // エラーが発生した場合はローディング状態をリセット
-      setLoading(false);
-      
-      // エラーを上位に再投げ
+      // エラーを上位に再投げして、呼び出し元でハンドリングできるようにする
       throw error;
     }
-    // 成功時のloadingリセットは onAuthStateChanged または Web版では上記で行われる
   };
 
   const value = {

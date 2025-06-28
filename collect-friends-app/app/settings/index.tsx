@@ -165,7 +165,7 @@ export default function SettingsIndexScreen() {
           {/* アプリ情報 */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Collect Friends App</Text>
-            <Text style={styles.footerText}>Version 1.0.1</Text>
+            <Text style={styles.footerText}>Version 1.0.2</Text>
           </View>
         </ThemedView>
       </ScrollView>
