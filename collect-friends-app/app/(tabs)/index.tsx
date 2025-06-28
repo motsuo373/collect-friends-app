@@ -357,7 +357,7 @@ function NativeHomeScreen() {
   useEffect(() => {
     const loadNativeMap = async () => {
       try {
-        // todo: 正しくエラー回避する方法を書く
+        // todo: 正しくエラー回避する方法を書くk
         // @ts-expect-error: Dynamic import for platform-specific component
         const module = await import('@/components/NativeMapScreen'); // eslint-disable-line
         setNativeMapComponent(() => module.default);
