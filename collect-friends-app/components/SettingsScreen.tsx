@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
   SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemedText } from './ThemedText';
@@ -17,31 +16,17 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
-    Alert.alert(
-      'ログアウト',
-      'ログアウトしますか？',
-      [
-        {
-          text: 'キャンセル',
-          style: 'cancel',
-        },
-        {
-          text: 'ログアウト',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await signOut();
-            } catch (error) {
-              console.error('ログアウトエラー:', error);
-              Alert.alert('エラー', 'ログアウトに失敗しました');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    setLoading(true);
+    try {
+      await signOut();
+    } catch (error) {
+      // エラーの詳細をコンソールに表示
+      let errorMessage = 'ログアウトに失敗しました';
+      if (error instanceof Error) {
+        errorMessage = `ログアウトに失敗しました: ${error.message}`;
+      }
+      setLoading(false);
+    }
   };
 
   return (
