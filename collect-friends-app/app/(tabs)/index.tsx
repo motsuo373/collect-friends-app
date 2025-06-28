@@ -8,12 +8,12 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusModal, UserStatus } from '@/components/StatusModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
+import { setDocument, getDocument, updateDocument } from '@/utils/firestoreService';
 import tw from 'twrnc';
 
 // Dynamic import for web only
@@ -23,6 +23,57 @@ interface UserLocation {
   latitude: number;
   longitude: number;
 }
+
+// UserStatusをFirestoreの構造に変換する関数（他のコンポーネントでも使用可能）
+export const convertUserStatusToFirestore = (status: UserStatus) => {
+  // 利用可能時間の計算
+  const calculateAvailableUntil = (availabilityType: UserStatus['availabilityType']) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    switch (availabilityType) {
+      case 'now':
+        // 3時間後まで暇
+        return new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      case 'evening':
+        // 今日の18:00から22:00まで
+        const todayEvening = new Date(today);
+        todayEvening.setHours(22, 0, 0, 0);
+        return todayEvening;
+      case 'tomorrow_morning':
+        // 明日の9:00から12:00まで
+        const tomorrowMorning = new Date(tomorrow);
+        tomorrowMorning.setHours(12, 0, 0, 0);
+        return tomorrowMorning;
+      case 'tomorrow_evening':
+        // 明日の18:00から22:00まで
+        const tomorrowEvening = new Date(tomorrow);
+        tomorrowEvening.setHours(22, 0, 0, 0);
+        return tomorrowEvening;
+      default:
+        return new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    }
+  };
+
+  const availabilityText = {
+    now: '今すぐ暇',
+    evening: '夕方から暇',
+    tomorrow_morning: '明日午前中暇',
+    tomorrow_evening: '明日夕方から暇',
+  }[status.availabilityType];
+
+  return {
+    status: status.isAvailable ? 'free' : 'busy',
+    availabilityType: status.availabilityType,
+    activities: status.activities,
+    moveRange: status.moveRange,
+    availableUntil: status.isAvailable ? calculateAvailableUntil(status.availabilityType) : null,
+    customMessage: status.isAvailable ? `${availabilityText} - ${status.activities.join('・')}` : '現在忙しいです',
+    lastUpdate: new Date(),
+  };
+};
 
 // Web版のコンポーネント
 function WebHomeScreen() {
@@ -57,7 +108,64 @@ function WebHomeScreen() {
 
   useEffect(() => {
     requestLocationPermission();
+    loadUserStatus();
   }, []);
+
+  // Firestoreからユーザーのステータスを読み込む
+  const loadUserStatus = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const userData = await getDocument(`/users/${user.uid}`);
+      
+      if (userData?.currentStatus) {
+        const firestoreStatus = userData.currentStatus;
+        const convertedStatus: UserStatus = {
+          isAvailable: firestoreStatus.status === 'free',
+          availabilityType: firestoreStatus.availabilityType || 'now',
+          activities: firestoreStatus.activities || [],
+          moveRange: firestoreStatus.moveRange || 1000,
+        };
+        setUserStatus(convertedStatus);
+      } else if (userData) {
+        // ユーザーは存在するがステータスがない場合、デフォルトステータスを設定
+        const defaultStatus: UserStatus = {
+          isAvailable: false,
+          availabilityType: 'now',
+          activities: [],
+          moveRange: 1000,
+        };
+        const firestoreStatus = convertUserStatusToFirestore(defaultStatus);
+        
+        await updateDocument(`/users/${user.uid}`, {
+          currentStatus: firestoreStatus
+        });
+        
+        setUserStatus(defaultStatus);
+      } else {
+        // ユーザードキュメント自体が存在しない場合、初期ユーザーデータを作成
+        const defaultStatus: UserStatus = {
+          isAvailable: false,
+          availabilityType: 'now',
+          activities: [],
+          moveRange: 1000,
+        };
+        const firestoreStatus = convertUserStatusToFirestore(defaultStatus);
+        
+        await setDocument(`/users/${user.uid}`, {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || 'ユーザー',
+          currentStatus: firestoreStatus,
+          isActive: true,
+        });
+        
+        setUserStatus(defaultStatus);
+      }
+    } catch (error) {
+      console.error('ユーザーステータス読み込みエラー:', error);
+    }
+  };
 
   const requestLocationPermission = async () => {
     try {
@@ -90,16 +198,39 @@ function WebHomeScreen() {
     }
   };
 
-  const handleStatusSave = (status: UserStatus) => {
-    setUserStatus(status);
-    console.log('ステータス保存:', status);
-    
-    Alert.alert(
-      'ステータス更新完了',
-      status.isAvailable 
-        ? `${status.activities.join('、')} で遊べる人を探しています！`
-        : '現在忙しい状態に設定されました。'
-    );
+  const handleStatusSave = async (status: UserStatus) => {
+    if (!user?.uid) {
+      Alert.alert('エラー', 'ユーザー情報が取得できません。');
+      return;
+    }
+
+    try {
+      // UserStatusをFirestore形式に変換
+      const firestoreStatus = convertUserStatusToFirestore(status);
+      
+      // Firestoreのusersコレクションにステータスを保存
+      await updateDocument(`/users/${user.uid}`, {
+        currentStatus: firestoreStatus
+      });
+
+      // ローカルステートも更新
+      setUserStatus(status);
+      
+      console.log('ステータス保存完了:', firestoreStatus);
+      
+      Alert.alert(
+        'ステータス更新完了',
+        status.isAvailable 
+          ? `${status.activities.join('、')} で遊べる人を探しています！`
+          : '現在忙しい状態に設定されました。'
+      );
+    } catch (error) {
+      console.error('ステータス保存エラー:', error);
+      Alert.alert(
+        'エラー',
+        'ステータスの保存に失敗しました。ネットワーク接続を確認してください。'
+      );
+    }
   };
 
   const getStatusText = () => {
@@ -226,7 +357,9 @@ function NativeHomeScreen() {
   useEffect(() => {
     const loadNativeMap = async () => {
       try {
-        const module = await import('@/components/NativeMapScreen');
+        // todo: 正しくエラー回避する方法を書く
+        // @ts-expect-error: Dynamic import for platform-specific component
+        const module = await import('@/components/NativeMapScreen'); // eslint-disable-line
         setNativeMapComponent(() => module.default);
       } catch (error) {
         console.error('NativeMapScreen読み込みエラー:', error);

@@ -321,3 +321,48 @@ AI-agentが自動的にユーザー同士を繋げ、位置情報と暇ステー
   - エッジコンピューティング活用
   - キャッシュ戦略の最適化
   - バッチ処理とリアルタイム処理の使い分け
+
+### データベース操作・Firestoreサービス
+
+#### データ保存・取得のための統一helper関数
+**ファイル:** `collect-friends-app/utils/firestoreService.ts`
+
+このアプリではFirestoreでのデータ操作を統一されたインターフェースで行うため、専用のhelper関数群を提供しています。**データを保存・取得する際は、必ずこのfirestoreService.tsのhelper関数を使用してください。**
+
+- **主要関数**
+  - `setDocument(path, data, merge)` - ドキュメントの作成・更新
+  - `getDocument(path)` - ドキュメントの取得
+  - `updateDocument(path, data)` - ドキュメントの部分更新
+  - `deleteDocument(path)` - ドキュメントの削除
+  - `getCollection(collectionPath)` - コレクション全体の取得
+  - `getCollectionWithQuery(collectionPath, constraints)` - クエリ付きコレクション取得
+  - `addDocument(collectionPath, data)` - 自動IDでドキュメント追加
+
+- **使用例**
+  ```typescript
+  import { setDocument, getDocument } from '../utils/firestoreService';
+  
+  // ユーザーデータを保存
+  await setDocument('/users/user123', {
+    name: '田中太郎',
+    email: 'tanaka@example.com',
+    age: 30
+  });
+  
+  // ユーザーデータを取得
+  const user = await getDocument('/users/user123');
+  ```
+
+- **Helper関数の利点**
+  - 統一されたAPI設計による保守性の向上
+  - 自動タイムスタンプ追加（createdAt, updatedAt）
+  - 包括的なエラーハンドリングとログ出力
+  - 直感的なパス指定（例："/users/uid"）
+  - TypeScript型安全性の保証
+  - 一貫したデータ構造の維持
+
+- **データ保存ガイドライン**
+  - 新しいデータ保存が必要な場合は、firestoreService.tsの関数を使用
+  - 直接FirestoreのSDKを呼び出さず、必ずhelper関数を経由
+  - データ構造の設計時は自動追加されるタイムスタンプフィールドを考慮
+  - エラーハンドリングはhelper関数に任せ、呼び出し元では適切な UI フィードバックに集中
