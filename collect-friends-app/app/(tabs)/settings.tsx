@@ -1,11 +1,5 @@
-import React from 'react';
-import { SafeAreaView } from 'react-native';
-import SettingsScreen from '@/components/SettingsScreen';
+import { Redirect } from 'expo-router';
 
 export default function Settings() {
-  return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <SettingsScreen />
-    </SafeAreaView>
-  );
+  return <Redirect href="/settings" />;
 } 
