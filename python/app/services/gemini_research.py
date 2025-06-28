@@ -11,6 +11,11 @@ from app.models import (
 from app.config import get_settings
 
 
+class GeminiAPIError(Exception):
+    """Gemini API関連のエラー"""
+    pass
+
+
 class GeminiResearchAgent:
     """Vertex AI Gemini APIを使用した深層調査エージェント"""
     
@@ -21,42 +26,24 @@ class GeminiResearchAgent:
     
     def _setup_vertex_ai(self):
         """Vertex AI設定のセットアップ"""
-        try:
-            if self.settings.GOOGLE_GENAI_USE_VERTEXAI:
-                # Vertex AI用の環境変数設定
-                os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
-                os.environ["GOOGLE_CLOUD_PROJECT"] = self.settings.GOOGLE_CLOUD_PROJECT
-                os.environ["GOOGLE_CLOUD_LOCATION"] = self.settings.GOOGLE_CLOUD_LOCATION
-                
-                from google import genai
-                from google.genai.types import HttpOptions
-                
-                # Vertex AI Client初期化
-                self.client = genai.Client(http_options=HttpOptions(api_version="v1"))
-                print(f"Vertex AI Client initialized for project: {self.settings.GOOGLE_CLOUD_PROJECT}")
-            else:
-                # フォールバック: 旧Gemini API
-                import google.generativeai as genai
-                genai.configure(api_key=self.settings.GEMINI_API_KEY)
-                self.model = genai.GenerativeModel('gemini-pro')
-                print("Fallback: Using legacy Gemini API")
-                
-        except Exception as e:
-            print(f"Vertex AI setup failed: {e}")
-            # フォールバック設定
-            self._setup_fallback()
-    
-    def _setup_fallback(self):
-        """フォールバック設定"""
-        try:
+        if self.settings.GOOGLE_GENAI_USE_VERTEXAI:
+            # Vertex AI用の環境変数設定
+            os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
+            os.environ["GOOGLE_CLOUD_PROJECT"] = self.settings.GOOGLE_CLOUD_PROJECT
+            os.environ["GOOGLE_CLOUD_LOCATION"] = self.settings.GOOGLE_CLOUD_LOCATION
+            
+            from google import genai
+            from google.genai.types import HttpOptions
+            
+            # Vertex AI Client初期化
+            self.client = genai.Client(http_options=HttpOptions(api_version="v1"))
+            print(f"Vertex AI Client initialized for project: {self.settings.GOOGLE_CLOUD_PROJECT}")
+        else:
+            # 旧Gemini API
             import google.generativeai as genai
             genai.configure(api_key=self.settings.GEMINI_API_KEY)
             self.model = genai.GenerativeModel('gemini-pro')
-            print("Using fallback Gemini API")
-        except Exception as e:
-            print(f"Fallback setup also failed: {e}")
-            self.client = None
-            self.model = None
+            print("Using legacy Gemini API")
     
     async def research_station_activities(
         self,
@@ -67,9 +54,6 @@ class GeminiResearchAgent:
     ) -> List[ActivityCategory]:
         """駅周辺のアクティビティを深層調査"""
         
-        # 駅名を保存（フォールバック時に使用）
-        self._current_station_name = station.station_name
-        
         # プロンプトの生成
         prompt = self._create_research_prompt(
             station.station_name,
@@ -78,20 +62,19 @@ class GeminiResearchAgent:
             current_time
         )
         
-        try:
-            # Vertex AI Gemini APIへのリクエスト
-            response = await self._call_gemini_async(prompt)
-            
-            # レスポンスをパース
-            activities = self._parse_research_response(response, activity_types)
-            
-            return activities
-            
-        except Exception as e:
-            print(f"Research error for {station.station_name}: {str(e)}")
-            # エラー時はフォールバックデータを返す
-            return self._create_fallback_activities(activity_types)
-            return self._create_fallback_activities(activity_types)
+        # Vertex AI Gemini APIへのリクエスト
+        response = await self._call_gemini_async(prompt)
+        
+        if not response:
+            raise GeminiAPIError(f"Gemini API returned empty response for station: {station.station_name}")
+        
+        # レスポンスをパース
+        activities = self._parse_research_response(response, activity_types)
+        
+        if not activities:
+            raise GeminiAPIError(f"Failed to parse activities for station: {station.station_name}")
+        
+        return activities
     
     def _create_research_prompt(
         self,
@@ -127,63 +110,58 @@ class GeminiResearchAgent:
         """Vertex AI Gemini APIへの非同期呼び出し"""
         
         def sync_call():
-            try:
-                if self.client and self.settings.GOOGLE_GENAI_USE_VERTEXAI:
-                    # Vertex AI経由
-                    response = self.client.models.generate_content(
-                        model=self.settings.GEMINI_MODEL,
-                        contents=prompt,
-                        config={
-                            "temperature": 0.7,
-                            "maxOutputTokens": 2048,
-                            "topP": 0.9
-                        }
-                    )
-                    return response.text if response.text else ""
-                
-                elif hasattr(self, 'model') and self.model:
-                    # 旧API経由（フォールバック）
-                    response = self.model.generate_content(prompt)
-                    return response.text if response.text else ""
-                
-                else:
-                    print("No available Gemini client")
-                    return ""
-                    
-            except Exception as e:
-                print(f"Gemini API call error: {str(e)}")
-                # 詳細エラーログ
-                if "authentication" in str(e).lower():
-                    print("Authentication error: Check ADC setup with 'gcloud auth application-default login'")
-                elif "project" in str(e).lower():
-                    print(f"Project error: Check GOOGLE_CLOUD_PROJECT={self.settings.GOOGLE_CLOUD_PROJECT}")
-                return ""
+            if self.client and self.settings.GOOGLE_GENAI_USE_VERTEXAI:
+                # Vertex AI経由
+                response = self.client.models.generate_content(
+                    model=self.settings.GEMINI_MODEL,
+                    contents=prompt,
+                    config={
+                        "temperature": 0.7,
+                        "maxOutputTokens": 2048,
+                        "topP": 0.9
+                    }
+                )
+                return response.text if response.text else ""
+            
+            elif hasattr(self, 'model') and self.model:
+                # 旧API経由
+                response = self.model.generate_content(prompt)
+                return response.text if response.text else ""
+            
+            else:
+                raise GeminiAPIError("No available Gemini client configured")
         
         # 同期関数を非同期で実行
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, sync_call)
+        try:
+            result = await loop.run_in_executor(None, sync_call)
+            return result
+        except Exception as e:
+            # 詳細エラーメッセージを含む例外を発生
+            error_msg = f"Gemini API call failed: {str(e)}"
+            if "authentication" in str(e).lower():
+                error_msg += " (Check ADC setup with 'gcloud auth application-default login')"
+            elif "project" in str(e).lower():
+                error_msg += f" (Check GOOGLE_CLOUD_PROJECT={self.settings.GOOGLE_CLOUD_PROJECT})"
+            raise GeminiAPIError(error_msg)
     
     def _parse_research_response(
-        self, 
-        response_text: str, 
+        self,
+        response_text: str,
         activity_types: List[ActivityType]
     ) -> List[ActivityCategory]:
         """Geminiのレスポンスをパース"""
         
         activities = []
         
+        # レスポンスからJSON部分を抽出（マークダウンコードブロックを考慮）
+        json_text = response_text
+        if "```json" in json_text:
+            json_text = json_text.split("```json")[1].split("```")[0]
+        elif "```" in json_text:
+            json_text = json_text.split("```")[1].split("```")[0]
+        
         try:
-            # JSONとして解析を試みる
-            # Geminiが正しいJSON形式で返さない場合があるため、
-            # エラーハンドリングを含む
-            
-            # レスポンスからJSON部分を抽出（マークダウンコードブロックを考慮）
-            json_text = response_text
-            if "```json" in json_text:
-                json_text = json_text.split("```json")[1].split("```")[0]
-            elif "```" in json_text:
-                json_text = json_text.split("```")[1].split("```")[0]
-            
             # JSONパース
             data = json.loads(json_text)
             
@@ -207,9 +185,7 @@ class GeminiResearchAgent:
                     )
             
         except (json.JSONDecodeError, KeyError, TypeError) as e:
-            print(f"Failed to parse Gemini response: {str(e)}")
-            # パース失敗時はフォールバックデータを使用
-            activities = self._create_fallback_activities(activity_types)
+            raise GeminiAPIError(f"Failed to parse Gemini response: {str(e)}. Response: {response_text[:500]}...")
         
         return activities
     
@@ -258,60 +234,3 @@ class GeminiResearchAgent:
             print(f"Error creating venue: {str(e)}")
             return None
     
-    def _create_fallback_activities(
-        self, 
-        activity_types: List[ActivityType]
-    ) -> List[ActivityCategory]:
-        """フォールバック用のアクティビティデータを生成"""
-        activities = []
-        
-        # 各アクティビティタイプに対してダミーデータを生成
-        fallback_venues = {
-            ActivityType.CAFE: [
-                VenueInfo(
-                    name="スターバックスコーヒー",
-                    rating=4.0,
-                    price_range="¥500-1500",
-                    crowd_level=CrowdLevel.MEDIUM,
-                    operating_hours="07:00-22:00",
-                    walking_time_min=5,
-                    special_features=["WiFi完備", "電源あり"],
-                    real_time_info="通常営業中"
-                )
-            ],
-            ActivityType.DRINK: [
-                VenueInfo(
-                    name="HUB",
-                    rating=3.8,
-                    price_range="¥2000-4000",
-                    crowd_level=CrowdLevel.MEDIUM,
-                    operating_hours="17:00-24:00",
-                    walking_time_min=3,
-                    special_features=["スポーツ観戦可", "立ち飲みスペースあり"],
-                    real_time_info="ハッピーアワー実施中"
-                )
-            ],
-            ActivityType.WALK: [
-                VenueInfo(
-                    name="駅前商店街",
-                    rating=3.5,
-                    price_range="無料",
-                    crowd_level=CrowdLevel.LOW,
-                    operating_hours="終日",
-                    walking_time_min=1,
-                    special_features=["屋根付き", "ベンチあり"],
-                    real_time_info="天候良好"
-                )
-            ]
-        }
-        
-        for activity_type in activity_types:
-            if activity_type in fallback_venues:
-                activities.append(
-                    ActivityCategory(
-                        category=activity_type,
-                        venues=fallback_venues[activity_type]
-                    )
-                )
-        
-        return activities

@@ -14,7 +14,7 @@ from app.models import (
     ActivityCategory
 )
 from app.services.station_search import StationSearchEngine
-from app.services.gemini_research import GeminiResearchAgent
+from app.services.gemini_research import GeminiResearchAgent, GeminiAPIError
 from app.config import get_settings
 
 
@@ -134,21 +134,35 @@ class RecommendationService:
                     return {
                         "station": station,
                         "activities": activities,
-                        "success": True
+                        "success": True,
+                        "error": None
                     }
                 except asyncio.TimeoutError:
-                    print(f"Research timeout for {station.station_name}")
+                    error_msg = f"Research timeout for {station.station_name}"
+                    print(error_msg)
                     return {
                         "station": station,
                         "activities": [],
-                        "success": False
+                        "success": False,
+                        "error": error_msg
+                    }
+                except GeminiAPIError as e:
+                    error_msg = f"Gemini API error for {station.station_name}: {str(e)}"
+                    print(error_msg)
+                    return {
+                        "station": station,
+                        "activities": [],
+                        "success": False,
+                        "error": error_msg
                     }
                 except Exception as e:
-                    print(f"Research error for {station.station_name}: {str(e)}")
+                    error_msg = f"Unexpected error for {station.station_name}: {str(e)}"
+                    print(error_msg)
                     return {
                         "station": station,
                         "activities": [],
-                        "success": False
+                        "success": False,
+                        "error": error_msg
                     }
         
         # 全駅の研究を並列実行
@@ -156,7 +170,18 @@ class RecommendationService:
         results = await asyncio.gather(*tasks)
         
         # 成功した結果のみ返す
-        return [r for r in results if r["success"] and r["activities"]]
+        successful_results = [r for r in results if r["success"] and r["activities"]]
+        
+        # すべての駅で失敗した場合はエラーを発生
+        if not successful_results:
+            failed_errors = [r["error"] for r in results if not r["success"]]
+            error_summary = "; ".join(failed_errors[:3])  # 最初の3つのエラーのみ表示
+            raise HTTPException(
+                status_code=503,
+                detail=f"All station research failed. Errors: {error_summary}"
+            )
+        
+        return successful_results
     
     def _create_recommendations(
         self,

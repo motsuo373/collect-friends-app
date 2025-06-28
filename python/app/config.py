@@ -19,7 +19,7 @@ class Settings:
     GOOGLE_CLOUD_LOCATION: str = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-pro-001")
     
-    # 旧Gemini API（フォールバック用）
+    # 旧Gemini API（レガシーサポート）
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     
     # 検索設定
