@@ -133,7 +133,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
       .user-marker {
         width: 44px;
         height: 44px;
-        border-color: #4285f4;
+        border-color: #FF8700;
       }
       
       .nearby-user-marker {
@@ -150,7 +150,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
       .user-marker svg {
         width: 24px;
         height: 24px;
-        color: #4285f4;
+        color: #FF8700;
       }
       
       .nearby-user-marker svg {
@@ -172,7 +172,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
   const createCustomIcon = (isUser = false) => {
     const className = isUser ? 'user-marker' : 'nearby-user-marker';
     const size = isUser ? 44 : 36;
-    const iconColor = isUser ? '#4285f4' : '#ea4335';
+    const iconColor = isUser ? '#FF8700' : '#ea4335';
     
     // SVGアイコンを作成
     const iconSvg = isUser 

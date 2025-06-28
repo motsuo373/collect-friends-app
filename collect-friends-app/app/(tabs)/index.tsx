@@ -314,7 +314,7 @@ function WebHomeScreen() {
   if (loading || !webMapLoaded) {
     return (
       <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100`}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#FF8700" />
         <ThemedText style={tw`mt-4 text-base text-gray-600`}>
           {loading ? '位置情報を取得中...' : 'マップを読み込み中...'}
         </ThemedText>
@@ -332,7 +332,7 @@ function WebHomeScreen() {
         <ThemedText style={tw`text-center text-gray-600 leading-6 mb-8`}>
           近くの友達を見つけるために{'\n'}位置情報の使用を許可してください
         </ThemedText>
-        <TouchableOpacity style={tw`bg-blue-500 px-8 py-3 rounded-full`} onPress={requestLocationPermission}>
+        <TouchableOpacity style={[tw`px-8 py-3 rounded-full`, { backgroundColor: '#FF8700' }]} onPress={requestLocationPermission}>
           <Text style={tw`text-white text-base font-semibold`}>再試行</Text>
         </TouchableOpacity>
       </ThemedView>
@@ -372,7 +372,7 @@ function WebHomeScreen() {
             style={tw`p-1`}
             onPress={() => setStatusModalVisible(true)}
           >
-            <Ionicons name="create-outline" size={20} color="#007AFF" />
+            <Ionicons name="create-outline" size={20} color="#FF8700" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -384,15 +384,10 @@ function WebHomeScreen() {
             style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-white mb-3`}
             onPress={handleMyLocationPress}
           >
-            <Ionicons name="locate" size={24} color="#007AFF" />
+            <Ionicons name="locate" size={24} color="#FF8700" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-blue-500`}
-            onPress={() => setStatusModalVisible(true)}
-          >
-            <Ionicons name="add" size={28} color="white" />
-          </TouchableOpacity>
+
         </View>
       </SafeAreaView>
 

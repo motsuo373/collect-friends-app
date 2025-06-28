@@ -170,19 +170,7 @@ export default function NativeMapScreen() {
 
   const getStatusText = () => {
     if (!userStatus.isAvailable) return '忙しい';
-    
-    const activityText = userStatus.activities.length > 0 
-      ? userStatus.activities.join('・') 
-      : 'なんでも';
-    
-    const availabilityText = {
-      now: '今すぐ',
-      evening: '夕方から',
-      tomorrow_morning: '明日午前',
-      tomorrow_evening: '明日夕方',
-    }[userStatus.availabilityType];
-
-    return `${availabilityText} ${activityText}`;
+    return '暇している';
   };
 
   if (loading) {
@@ -236,7 +224,7 @@ export default function NativeMapScreen() {
             >
               <View style={[
                 tw`w-10 h-10 rounded-full justify-center items-center border-2 border-white shadow-md`,
-                { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
+                { backgroundColor: userStatus.isAvailable ? '#FF8700' : '#666666' }
               ]}>
                 <Ionicons 
                   name="person" 
@@ -260,17 +248,24 @@ export default function NativeMapScreen() {
       </MapView>
 
       <SafeAreaView style={tw`absolute top-0 left-0 right-0`}>
-        <View style={tw`mx-4 mt-2 bg-white rounded-full px-4 py-3 flex-row items-center shadow-lg`}>
-          <View style={[
-            tw`w-3 h-3 rounded-full mr-3`,
-            { backgroundColor: userStatus.isAvailable ? '#4CAF50' : '#FF9800' }
-          ]} />
-          <Text style={tw`flex-1 text-sm font-medium text-gray-800`}>{getStatusText()}</Text>
-          <TouchableOpacity
-            style={tw`p-1`}
+        <View style={tw`mx-4 mt-2`}>
+          <TouchableOpacity 
+            style={tw`bg-white rounded-full px-5 py-3 flex-row items-center justify-center shadow-lg`}
             onPress={() => setStatusModalVisible(true)}
           >
-            <Ionicons name="create-outline" size={20} color="#007AFF" />
+            <View style={[
+              tw`w-2 h-2 rounded-full mr-2`,
+              { backgroundColor: userStatus.isAvailable ? '#34C759' : '#FF8700' }
+            ]} />
+            <Text style={tw`flex-1 text-base font-normal text-black`}>
+              {getStatusText()}
+            </Text>
+            <TouchableOpacity
+              style={tw`p-1`}
+              onPress={() => setStatusModalVisible(true)}
+            >
+              <Ionicons name="settings-outline" size={20} color="#666" />
+            </TouchableOpacity>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -301,4 +296,4 @@ export default function NativeMapScreen() {
       />
     </View>
   );
-} 
+}

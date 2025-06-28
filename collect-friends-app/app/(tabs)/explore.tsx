@@ -20,23 +20,12 @@ interface ChatRoom {
   lastMessageTime: Date;
   participantCount: number;
   isActive: boolean;
-  type: 'ai_proposal' | 'group' | 'direct';
-}
-
-interface AIProposal {
-  id: string;
-  title: string;
-  description: string;
-  participants: string[];
-  status: 'pending' | 'accepted' | 'declined';
-  createdAt: Date;
+  type: 'group' | 'direct';
 }
 
 export default function ChatScreen() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'chats' | 'proposals'>('chats');
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
-  const [aiProposals, setAIProposals] = useState<AIProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,7 +44,7 @@ export default function ChatScreen() {
         lastMessageTime: new Date(Date.now() - 1000 * 60 * 30), // 30分前
         participantCount: 4,
         isActive: true,
-        type: 'ai_proposal'
+        type: 'group'
       },
       {
         id: '2', 
@@ -77,27 +66,7 @@ export default function ChatScreen() {
       }
     ];
 
-    const mockAIProposals: AIProposal[] = [
-      {
-        id: '1',
-        title: '新宿でランチ 🍽️',
-        description: '近くにいる3人でイタリアンはいかがですか？美味しいお店を見つけました！',
-        participants: ['あなた', '田中さん', '佐藤さん'],
-        status: 'pending',
-        createdAt: new Date(Date.now() - 1000 * 60 * 15) // 15分前
-      },
-      {
-        id: '2',
-        title: 'ボウリング 🎳',
-        description: '今夜空いている4人でボウリングしませんか？割引キャンペーン中です！',
-        participants: ['あなた', '山田さん', '鈴木さん', '高橋さん'],
-        status: 'pending',
-        createdAt: new Date(Date.now() - 1000 * 60 * 45) // 45分前
-      }
-    ];
-
     setChatRooms(mockChatRooms);
-    setAIProposals(mockAIProposals);
     setLoading(false);
   };
 
@@ -115,7 +84,6 @@ export default function ChatScreen() {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'ai_proposal': return 'sparkles';
       case 'group': return 'people';
       case 'direct': return 'person';
       default: return 'chatbubble';
@@ -129,8 +97,8 @@ export default function ChatScreen() {
     >
       <View style={tw`flex-row items-center justify-between mb-2`}>
         <View style={tw`flex-row items-center flex-1`}>
-          <View style={tw`w-12 h-12 rounded-full bg-blue-100 items-center justify-center mr-3`}>
-            <Ionicons name={getTypeIcon(item.type) as any} size={20} color="#007AFF" />
+          <View style={[tw`w-12 h-12 rounded-full items-center justify-center mr-3`, { backgroundColor: '#FFF5E6' }]}>
+            <Ionicons name={getTypeIcon(item.type) as any} size={20} color="#FF8700" />
           </View>
           <View style={tw`flex-1`}>
             <Text style={tw`text-base font-semibold text-gray-800 mb-1`}>{item.name}</Text>
@@ -147,49 +115,10 @@ export default function ChatScreen() {
             <Ionicons name="people-outline" size={12} color="#999" />
             <Text style={tw`text-xs text-gray-500 ml-1`}>{item.participantCount}</Text>
             {item.isActive && (
-              <View style={tw`w-2 h-2 bg-green-500 rounded-full ml-2`} />
+              <View style={[tw`w-2 h-2 rounded-full ml-2`, { backgroundColor: '#FF8700' }]} />
             )}
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const AIProposalItem = ({ item }: { item: AIProposal }) => (
-    <TouchableOpacity
-      style={tw`bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-3 border border-blue-200`}
-      onPress={() => Alert.alert('AI提案', `${item.title} の詳細を確認しますか？`)}
-    >
-      <View style={tw`flex-row items-start justify-between mb-3`}>
-        <View style={tw`flex-1`}>
-          <View style={tw`flex-row items-center mb-2`}>
-            <Ionicons name="sparkles" size={16} color="#8B5CF6" />
-            <Text style={tw`text-sm font-medium text-purple-600 ml-1`}>AI提案</Text>
-            <Text style={tw`text-xs text-gray-500 ml-2`}>
-              {formatTime(item.createdAt)}
-            </Text>
-          </View>
-          <Text style={tw`text-base font-semibold text-gray-800 mb-2`}>{item.title}</Text>
-          <Text style={tw`text-sm text-gray-600 leading-5 mb-3`}>{item.description}</Text>
-          <Text style={tw`text-xs text-gray-500`}>
-            参加者: {item.participants.join(', ')}
-          </Text>
-        </View>
-      </View>
-      
-      <View style={tw`flex-row justify-end`}>
-        <TouchableOpacity
-          style={tw`bg-gray-200 px-4 py-2 rounded-full mr-2`}
-          onPress={() => Alert.alert('辞退', 'この提案を辞退しますか？')}
-        >
-          <Text style={tw`text-sm font-medium text-gray-700`}>辞退</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={tw`bg-blue-500 px-4 py-2 rounded-full`}
-          onPress={() => Alert.alert('参加', 'この提案に参加しますか？')}
-        >
-          <Text style={tw`text-sm font-medium text-white`}>参加</Text>
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -202,7 +131,7 @@ export default function ChatScreen() {
     return (
       <SafeAreaView style={tw`flex-1 bg-gray-50`}>
         <View style={tw`flex-1 justify-center items-center`}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#FF8700" />
           <Text style={tw`mt-4 text-gray-600`}>チャットを読み込み中...</Text>
         </View>
       </SafeAreaView>
@@ -216,7 +145,7 @@ export default function ChatScreen() {
         <Text style={tw`text-xl font-bold text-gray-800 mb-4`}>チャット</Text>
         
         {/* 検索バー */}
-        <View style={tw`bg-gray-100 rounded-full px-4 py-2 flex-row items-center mb-4`}>
+        <View style={tw`bg-gray-100 rounded-full px-4 py-2 flex-row items-center`}>
           <Ionicons name="search" size={20} color="#999" />
           <TextInput
             style={tw`flex-1 ml-2 text-base`}
@@ -225,84 +154,32 @@ export default function ChatScreen() {
             onChangeText={setSearchQuery}
           />
         </View>
-
-        {/* タブ */}
-        <View style={tw`flex-row bg-gray-100 rounded-full p-1`}>
-          <TouchableOpacity
-            style={[
-              tw`flex-1 py-2 rounded-full items-center`,
-              activeTab === 'chats' ? tw`bg-white shadow-sm` : tw``
-            ]}
-            onPress={() => setActiveTab('chats')}
-          >
-            <Text style={[
-              tw`text-sm font-medium`,
-              activeTab === 'chats' ? tw`text-blue-600` : tw`text-gray-600`
-            ]}>
-              チャット ({chatRooms.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              tw`flex-1 py-2 rounded-full items-center`,
-              activeTab === 'proposals' ? tw`bg-white shadow-sm` : tw``
-            ]}
-            onPress={() => setActiveTab('proposals')}
-          >
-            <Text style={[
-              tw`text-sm font-medium`,
-              activeTab === 'proposals' ? tw`text-blue-600` : tw`text-gray-600`
-            ]}>
-              AI提案 ({aiProposals.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
-      {/* コンテンツ */}
+      {/* チャットリスト */}
       <View style={tw`flex-1 p-6`}>
-        {activeTab === 'chats' ? (
-          <FlatList
-            data={filteredChatRooms}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <ChatRoomItem item={item} />}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={tw`flex-1 justify-center items-center py-20`}>
-                <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
-                <Text style={tw`mt-4 text-lg font-medium text-gray-600`}>
-                  チャットがありません
-                </Text>
-                <Text style={tw`mt-2 text-sm text-gray-500 text-center`}>
-                  AI提案から新しい会話を始めましょう！
-                </Text>
-              </View>
-            }
-          />
-        ) : (
-          <FlatList
-            data={aiProposals}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <AIProposalItem item={item} />}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={tw`flex-1 justify-center items-center py-20`}>
-                <Ionicons name="sparkles-outline" size={64} color="#ccc" />
-                <Text style={tw`mt-4 text-lg font-medium text-gray-600`}>
-                  AI提案がありません
-                </Text>
-                <Text style={tw`mt-2 text-sm text-gray-500 text-center`}>
-                  暇ステータスを設定すると{'\n'}AI提案が届きます！
-                </Text>
-              </View>
-            }
-          />
-        )}
+        <FlatList
+          data={filteredChatRooms}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <ChatRoomItem item={item} />}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={tw`flex-1 justify-center items-center py-20`}>
+              <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
+              <Text style={tw`mt-4 text-lg font-medium text-gray-600`}>
+                チャットがありません
+              </Text>
+              <Text style={tw`mt-2 text-sm text-gray-500 text-center`}>
+                AI提案から新しい会話を始めましょう！
+              </Text>
+            </View>
+          }
+        />
       </View>
 
       {/* フローティングアクションボタン */}
       <TouchableOpacity
-        style={tw`absolute right-6 bottom-6 w-14 h-14 bg-blue-500 rounded-full items-center justify-center shadow-lg`}
+        style={[tw`absolute right-6 bottom-6 w-14 h-14 rounded-full items-center justify-center shadow-lg`, { backgroundColor: '#FF8700' }]}
         onPress={() => Alert.alert('新規チャット', '新しいチャットを作成します')}
       >
         <Ionicons name="add" size={28} color="white" />
