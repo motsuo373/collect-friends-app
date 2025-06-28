@@ -18,23 +18,13 @@ export default function SettingsScreen() {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      console.log('ログアウト処理を開始します...');
       await signOut();
-      console.log('ログアウト処理が完了しました');
-      // ログアウト成功時はユーザーはログイン画面に自動リダイレクトされるため、
-      // ここでローディング状態をリセットする必要はない
     } catch (error) {
-      console.error('ログアウトエラー:', error);
-      
       // エラーの詳細をコンソールに表示
       let errorMessage = 'ログアウトに失敗しました';
       if (error instanceof Error) {
         errorMessage = `ログアウトに失敗しました: ${error.message}`;
       }
-      
-      console.error('エラー詳細:', errorMessage);
-      
-      // エラーが発生した場合のみローディング状態をリセット
       setLoading(false);
     }
   };

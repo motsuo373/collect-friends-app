@@ -34,12 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('Setting up auth state listener...');
-    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        console.log('Auth state changed:', firebaseUser?.uid || 'null');
-        
         if (firebaseUser) {
           // ユーザーがログインしている場合、Firestoreにユーザー情報を保存
           await createOrUpdateUserDocument(firebaseUser);
@@ -83,7 +79,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         await setDoc(userDocRef, userData);
-        console.log('新規ユーザーが作成されました:', userData);
       } else {
         // 既存ユーザーの場合、最終更新日時を更新
         await setDoc(userDocRef, { 
@@ -92,7 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: firebaseUser.email || userDoc.data().email,
           avatar: firebaseUser.photoURL || userDoc.data().avatar,
         }, { merge: true });
-        console.log('既存ユーザー情報を更新しました');
       }
     } catch (error) {
       console.error('ユーザードキュメント作成/更新エラー:', error);
@@ -101,18 +95,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      console.log('Firebase signOut を開始します...');
       setLoading(true); // ログアウト処理中はローディング状態にする
       
       // Firebase認証からサインアウト
       await firebaseSignOut(auth);
       
-      console.log('Firebase signOut が完了しました');
-      
       // Web版の場合、追加の処理を実行
       if (Platform.OS === 'web') {
-        console.log('Web版のログアウト処理を実行します...');
-        
         // ローカルの状態を強制的にクリア
         setUser(null);
         setLoading(false);
@@ -131,11 +120,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           firebaseKeys.forEach(key => window.localStorage.removeItem(key));
           
-          console.log('Web版ログアウト：ストレージをクリアしました');
-          
           // 強制的にページをリロードしてすべての状態をリセット
           setTimeout(() => {
-            console.log('Web版ログアウト：ページをリロードします');
             window.location.reload();
           }, 200);
         }
