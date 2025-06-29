@@ -1,0 +1,18 @@
+{
+  "user_location": {
+    "latitude": 35.676225,
+    "longitude": 139.650348
+  },
+  "search_params": {
+    "search_radius_km": 10,
+    "max_stations": 20
+  },
+  "group_info": {
+    "member_count": 2,
+    "member_moods": ["お茶・カフェ", "散歩・ぶらぶら"],
+    "budget_range": "¥1500-4500"
+  },
+  "context": {
+    "current_time": "2025-06-29T14:30:00+09:00"
+  }
+}

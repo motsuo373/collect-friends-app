@@ -1,0 +1,24 @@
+# Core dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-dotenv==1.0.0
+geopy==2.4.1
+aiohttp==3.9.0
+redis==5.0.1
+langgraph==0.2.50
+langchain==0.3.10
+langchain-google-genai==2.0.7
+google-generativeai==0.8.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+aiofiles==23.2.1
+python-json-logger==2.0.7
+tenacity==8.2.3
+
+# Dev dependencies
+pytest==7.4.0
+pytest-asyncio==0.21.0
+httpx==0.26.0
+black==23.12.0
+flake8==7.0.0
+mypy==1.8.0

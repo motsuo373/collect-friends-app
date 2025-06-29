@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: recommendations-api
+    ports:
+      - "8080:8080"
+    environment:
+      # API Configuration
+      - API_TITLE=位置情報ベース おすすめアクティビティ推薦API
+      - API_VERSION=1.0.0
+      - PORT=8080
+      - LOG_LEVEL=INFO
+      
+      # External APIs
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-pro
+      
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379/0
+      - STATION_CACHE_TTL=3600
+      - FINAL_RESULT_CACHE_TTL=1800
+      
+      # Processing Configuration
+      - MAX_CONCURRENT_RESEARCH=4
+      - RESEARCH_TIMEOUT_SECONDS=300
+      
+      # Security Configuration
+      - API_KEY_HEADER=X-API-Key
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      
+      # Python Configuration
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      # Development volumes (comment out for production)
+      - ./app:/app/app:ro
+      - ./research:/app/research:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: recommendations-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    sysctls:
+      - net.core.somaxconn=1024
+
+  # Optional: Redis Commander for development
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    hostname: redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    networks:
+      - app-network
+    depends_on:
+      - redis
+    profiles:
+      - dev
+
+networks:
+  app-network:
+    name: recommendations-network
+    driver: bridge
+
+volumes:
+  redis-data:
+    name: recommendations-redis-data
