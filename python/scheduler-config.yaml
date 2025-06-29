@@ -1,0 +1,60 @@
+# Cloud Scheduler設定ファイル
+# 使用方法: gcloud scheduler jobs create http JOB_NAME --config-from-file=scheduler-config.yaml
+
+scheduler_jobs:
+  # 毎時レコメンデーション更新ジョブ
+  - name: "recommendation-update-hourly"
+    description: "毎時のレコメンデーション更新ジョブ"
+    schedule: "0 * * * *"  # 毎時0分に実行
+    time_zone: "Asia/Tokyo"
+    http_target:
+      uri: "https://YOUR_CLOUD_RUN_URL/api/v1/activity-recommendations"
+      http_method: "POST"
+      headers:
+        Content-Type: "application/json"
+      body: |
+        {
+          "user_location": {
+            "latitude": 35.6762,
+            "longitude": 139.6503,
+            "accuracy": 10
+          },
+          "group_info": {
+            "member_count": 2,
+            "member_moods": ["お茶・カフェ"],
+            "budget_range": "medium",
+            "duration_hours": 2.0
+          },
+          "preferences": {
+            "search_radius_km": 10,
+            "max_stations": 20,
+            "activity_types": ["お茶・カフェ", "散歩・ぶらぶら"],
+            "exclude_crowded": false
+          },
+          "context": {
+            "current_time": "2025-01-01T12:00:00+09:00",
+            "weather_consideration": true,
+            "accessibility_needs": []
+          }
+        }
+      oidc_token:
+        service_account_email: "your-service-account@your-project.iam.gserviceaccount.com"
+    retry_config:
+      retry_count: 3
+      max_retry_duration: "1800s"
+      min_backoff_duration: "5s"
+      max_backoff_duration: "3600s"
+      max_doublings: 3
+
+  # 毎日のキャッシュクリアジョブ
+  - name: "cache-cleanup-daily"
+    description: "毎日のキャッシュクリーンアップジョブ"
+    schedule: "0 2 * * *"  # 毎日2時に実行
+    time_zone: "Asia/Tokyo"
+    http_target:
+      uri: "https://YOUR_CLOUD_RUN_URL/admin/cache/clear"
+      http_method: "POST"
+      oidc_token:
+        service_account_email: "your-service-account@your-project.iam.gserviceaccount.com"
+    retry_config:
+      retry_count: 1 

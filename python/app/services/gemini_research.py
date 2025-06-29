@@ -32,18 +32,31 @@ class GeminiResearchAgent:
             os.environ["GOOGLE_CLOUD_PROJECT"] = self.settings.GOOGLE_CLOUD_PROJECT
             os.environ["GOOGLE_CLOUD_LOCATION"] = self.settings.GOOGLE_CLOUD_LOCATION
             
-            from google import genai
-            from google.genai.types import HttpOptions
-            
-            # Vertex AI Client初期化
-            self.client = genai.Client(http_options=HttpOptions(api_version="v1"))
-            print(f"Vertex AI Client initialized for project: {self.settings.GOOGLE_CLOUD_PROJECT}")
+            try:
+                from google import genai
+                from google.genai.types import HttpOptions
+                
+                # Vertex AI Client初期化
+                self.client = genai.Client(http_options=HttpOptions(api_version="v1"))
+                print(f"Vertex AI Client initialized for project: {self.settings.GOOGLE_CLOUD_PROJECT}")
+            except Exception as e:
+                print(f"WARNING: Failed to initialize Vertex AI: {e}")
+                self.client = None
         else:
             # 旧Gemini API
-            import google.generativeai as genai
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(self.settings.GEMINI_MODEL)
-            print(f"Using legacy Gemini API with model: {self.settings.GEMINI_MODEL}")
+            if not self.settings.GEMINI_API_KEY or self.settings.GEMINI_API_KEY.strip() == "" or self.settings.GEMINI_API_KEY == "your_gemini_api_key_here":
+                print("WARNING: Gemini API key not configured. AI features will be disabled.")
+                self.model = None
+                return
+            
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=self.settings.GEMINI_API_KEY)
+                self.model = genai.GenerativeModel(self.settings.GEMINI_MODEL)
+                print(f"Using legacy Gemini API with model: {self.settings.GEMINI_MODEL}")
+            except Exception as e:
+                print(f"WARNING: Failed to initialize Gemini API: {e}")
+                self.model = None
     
     async def research_station_activities(
         self,
@@ -129,7 +142,8 @@ class GeminiResearchAgent:
                 return response.text if response.text else ""
             
             else:
-                raise GeminiAPIError("No available Gemini client configured")
+                print("WARNING: No Gemini client available. Returning empty response.")
+                return ""
         
         # 同期関数を非同期で実行
         loop = asyncio.get_event_loop()

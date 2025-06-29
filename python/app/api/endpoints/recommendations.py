@@ -1,31 +1,41 @@
+"""
+推奨システムのAPIエンドポイント
+"""
 import asyncio
 import time
 import uuid
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from typing import List, Dict, Any, Optional, Tuple
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from datetime import datetime
 
 from app.models import (
     ActivityRecommendationRequest,
     ActivityRecommendationResponse,
-    Recommendation,
-    ResearchMetadata,
-    StationInfo,
-    ActivityCategory,
+    RestaurantRecommendationRequest,
+    RestaurantRecommendationResponse,
     LocationData
 )
-from app.services.station_search import StationSearchEngine
-from app.services.gemini_research import GeminiResearchAgent, GeminiAPIError
+from app.services.activity_recommendation_service import ActivityRecommendationService
+from app.services.restaurant_recommendation_service import RestaurantRecommendationService
+from app.services.gemini_research import GeminiResearchAgent
+from app.services.google_places import GooglePlacesService
 from app.config import get_settings
 
 
 router = APIRouter(prefix="/api/v1", tags=["recommendations"])
 
 
+# サービスのシングルトンインスタンス
+activity_service = ActivityRecommendationService()
+restaurant_service = RestaurantRecommendationService()
+
+
 @router.get("/debug/station-search-status")
 async def get_station_search_status():
     """駅検索サービスの状態をデバッグ用に確認"""
     try:
+        from app.services.station_search import StationSearchEngine
+        
         station_search = StationSearchEngine()
         status = station_search.get_service_status()
         
@@ -45,366 +55,72 @@ async def get_station_search_status():
         }
 
 
-class RecommendationService:
-    """推奨サービスのメインロジック"""
-    
-    def __init__(self):
-        self.settings = get_settings()
-        self.station_search = StationSearchEngine()
-        self.gemini_agent = GeminiResearchAgent()
-    
-    async def generate_recommendations(
-        self,
-        request: ActivityRecommendationRequest
-    ) -> ActivityRecommendationResponse:
-        """アクティビティ推奨を生成"""
+@router.get("/debug/restaurant-search-status")
+async def get_restaurant_search_status():
+    """店舗検索サービスの状態をデバッグ用に確認"""
+    try:
+        places_service = GooglePlacesService()
         
-        start_time = time.time()
-        request_id = f"req_{uuid.uuid4().hex[:8]}"
+        # API キーの確認
+        api_key_available = places_service.api_key is not None and places_service.api_key != ""
         
-        try:
-            # 1. 駅検索
-            stations = await self.station_search.get_stations_for_research(
-                request.user_location,
-                request.preferences.search_radius_km,
-                request.preferences.max_stations
-            )
-            
-            if not stations:
-                raise HTTPException(
-                    status_code=404,
-                    detail="指定された範囲内に駅が見つかりませんでした"
-                )
-            
-            # 2. 並列研究実行
-            research_results = await self._parallel_research(
-                stations,
-                request.group_info,
-                request.preferences.activity_types,
-                request.context.current_time
-            )
-            
-            # 3. 結果の統合とスコアリング
-            recommendations = self._create_recommendations(
-                research_results,
-                request.group_info,
-                request.context
-            )
-            
-            # 4. レスポンスの構築
-            processing_time = int((time.time() - start_time) * 1000)
-            
-            response = ActivityRecommendationResponse(
-                success=True,
-                request_id=request_id,
-                processing_time_ms=processing_time,
-                recommendations=recommendations[:10],  # 上位10件
-                research_metadata=ResearchMetadata(
-                    stations_analyzed=len(stations),
-                    venues_researched=sum(
-                        len(r["activities"]) 
-                        for r in research_results 
-                        if r["activities"]
-                    ),
-                    research_loops_executed=min(
-                        self.settings.MAX_RESEARCH_LOOPS,
-                        len(stations)
-                    ),
-                    data_sources=["Gemini AI", "Station Database", "Real-time APIs"]
-                )
-            )
-            
-            return response
-            
-        except Exception as e:
-            return ActivityRecommendationResponse(
-                success=False,
-                request_id=request_id,
-                processing_time_ms=int((time.time() - start_time) * 1000),
-                recommendations=[],
-                research_metadata=ResearchMetadata(
-                    stations_analyzed=0,
-                    venues_researched=0,
-                    research_loops_executed=0,
-                    data_sources=[]
-                ),
-                error_message=str(e)
-            )
-    
-    async def _parallel_research(
-        self,
-        stations,
-        group_info,
-        activity_types,
-        current_time
-    ) -> List[dict]:
-        """並列で駅の研究を実行"""
+        # テスト位置（東京駅周辺）
+        test_location = LocationData(latitude=35.6812, longitude=139.7671)
         
-        # セマフォで同時実行数を制限
-        semaphore = asyncio.Semaphore(self.settings.MAX_CONCURRENT_RESEARCH)
-        
-        async def research_with_semaphore(station):
-            async with semaphore:
-                try:
-                    activities = await asyncio.wait_for(
-                        self.gemini_agent.research_station_activities(
-                            station,
-                            group_info,
-                            activity_types,
-                            current_time
-                        ),
-                        timeout=self.settings.RESEARCH_TIMEOUT_SECONDS
-                    )
-                    return {
-                        "station": station,
-                        "activities": activities,
-                        "success": True,
-                        "error": None
-                    }
-                except asyncio.TimeoutError:
-                    error_msg = f"Research timeout for {station.station_name}"
-                    print(error_msg)
-                    return {
-                        "station": station,
-                        "activities": [],
-                        "success": False,
-                        "error": error_msg
-                    }
-                except GeminiAPIError as e:
-                    error_msg = f"Gemini API error for {station.station_name}: {str(e)}"
-                    print(error_msg)
-                    return {
-                        "station": station,
-                        "activities": [],
-                        "success": False,
-                        "error": error_msg
-                    }
-                except Exception as e:
-                    error_msg = f"Unexpected error for {station.station_name}: {str(e)}"
-                    print(error_msg)
-                    return {
-                        "station": station,
-                        "activities": [],
-                        "success": False,
-                        "error": error_msg
-                    }
-        
-        # 全駅の研究を並列実行
-        tasks = [research_with_semaphore(station) for station in stations]
-        results = await asyncio.gather(*tasks)
-        
-        # 成功した結果のみ返す
-        successful_results = [r for r in results if r["success"] and r["activities"]]
-        
-        # すべての駅で失敗した場合はエラーを発生
-        if not successful_results:
-            failed_errors = [r["error"] for r in results if not r["success"]]
-            error_summary = "; ".join(failed_errors[:3])  # 最初の3つのエラーのみ表示
-            raise HTTPException(
-                status_code=503,
-                detail=f"All station research failed. Errors: {error_summary}"
-            )
-        
-        return successful_results
-    
-    def _create_recommendations(
-        self,
-        research_results: List[dict],
-        group_info,
-        context
-    ) -> List[Recommendation]:
-        """研究結果から推奨リストを作成"""
-        
-        recommendations = []
-        
-        for idx, result in enumerate(research_results):
-            station = result["station"]
-            activities = result["activities"]
-            
-            # スコア計算（簡略版）
-            score = self._calculate_score(
-                station,
-                activities,
-                group_info,
-                context
-            )
-            
-            # 推奨理由の生成
-            reason = self._generate_reason(
-                station,
-                activities,
-                group_info
-            )
-            
-            # コスト見積もり
-            estimated_cost = self._estimate_cost(
-                activities,
-                group_info
-            )
-            
-            # 天候適合性
-            weather_suitability = self._check_weather_suitability(
-                activities,
-                context
-            )
-            
-            recommendation = Recommendation(
-                rank=idx + 1,
-                station_info=StationInfo(
-                    name=station.station_name,
-                    lines=station.lines,
-                    distance_from_user_m=int(station.distance_km * 1000),
-                    travel_time_min=int(station.distance_km * 3)  # 簡略計算
-                ),
-                activities=activities,
-                overall_score=round(score, 1),
-                recommendation_reason=reason,
-                estimated_total_cost=estimated_cost,
-                weather_suitability=weather_suitability
-            )
-            
-            recommendations.append(recommendation)
-        
-        # スコアで並び替え
-        recommendations.sort(key=lambda x: x.overall_score, reverse=True)
-        
-        # ランクを再設定
-        for idx, rec in enumerate(recommendations):
-            rec.rank = idx + 1
-        
-        return recommendations
-    
-    def _calculate_score(
-        self,
-        station,
-        activities: List[ActivityCategory],
-        group_info,
-        context
-    ) -> float:
-        """推奨スコアを計算"""
-        
-        score = 5.0  # ベーススコア
-        
-        # 距離による減点（近いほど高スコア）
-        if station.distance_km < 2:
-            score += 2.0
-        elif station.distance_km < 5:
-            score += 1.0
-        elif station.distance_km > 10:
-            score -= 1.0
-        
-        # アクティビティの充実度
-        total_venues = sum(len(cat.venues) for cat in activities)
-        if total_venues > 10:
-            score += 1.5
-        elif total_venues > 5:
-            score += 0.5
-        
-        # 希望アクティビティのカバー率
-        requested_types = set(group_info.member_moods)
-        available_types = set(cat.category for cat in activities)
-        coverage = len(requested_types.intersection(available_types)) / len(requested_types)
-        score += coverage * 2.0
-        
-        # 大都市駅ボーナス
-        if station.is_major_city_station:
-            score += 0.5
-        
-        # スコアを0-10の範囲に正規化
-        return min(max(score, 0), 10)
-    
-    def _generate_reason(
-        self,
-        station,
-        activities: List[ActivityCategory],
-        group_info
-    ) -> str:
-        """推奨理由を生成"""
-        
-        reasons = []
-        
-        # アクティビティのマッチング
-        matched_moods = []
-        for mood in group_info.member_moods:
-            if any(cat.category == mood for cat in activities):
-                matched_moods.append(mood.value)
-        
-        if matched_moods:
-            reasons.append(f"グループの気分「{'、'.join(matched_moods)}」に最適")
-        
-        # 駅の特徴
-        if station.distance_km < 2:
-            reasons.append("現在地から非常に近い")
-        
-        if station.is_major_city_station:
-            reasons.append("多様な選択肢がある主要駅")
-        
-        # 人数への適合性
-        total_venues = sum(len(cat.venues) for cat in activities)
-        if total_venues > 10:
-            reasons.append(f"{group_info.member_count}名のグループに適した店舗が豊富")
-        
-        return "。".join(reasons) + "。"
-    
-    def _estimate_cost(
-        self,
-        activities: List[ActivityCategory],
-        group_info
-    ) -> str:
-        """総コストを見積もる"""
-        
-        # 予算範囲に基づく見積もり
-        cost_ranges = {
-            "low": (500, 1500),
-            "medium": (1500, 4500),
-            "high": (4500, 10000)
-        }
-        
-        min_cost, max_cost = cost_ranges.get(
-            group_info.budget_range.value,
-            (1000, 5000)
+        # 駅検索テスト
+        stations = places_service.search_nearby_spots(
+            test_location, 
+            radius_m=2000, 
+            included_types=["train_station", "subway_station"], 
+            max_results=3
         )
         
-        total_min = min_cost * group_info.member_count
-        total_max = max_cost * group_info.member_count
+        # 店舗検索テスト
+        restaurants = places_service.search_restaurants_near_location(
+            test_location,
+            radius_m=1000,
+            max_results=5
+        )
         
-        return f"¥{total_min:,}-{total_max:,}"
-    
-    def _check_weather_suitability(
-        self,
-        activities: List[ActivityCategory],
-        context
-    ) -> str:
-        """天候適合性をチェック"""
-        
-        # 屋内施設の割合を計算
-        total_venues = 0
-        indoor_venues = 0
-        
-        for cat in activities:
-            for venue in cat.venues:
-                total_venues += 1
-                # 簡略化: カフェ、飲み、映画、ショッピングは屋内と仮定
-                if cat.category in [
-                    "お茶・カフェ", "軽く飲み", "映画", "買い物・ショッピング"
-                ]:
-                    indoor_venues += 1
-        
-        if total_venues == 0:
-            return "情報不足"
-        
-        indoor_ratio = indoor_venues / total_venues
-        
-        if indoor_ratio > 0.8:
-            return "雨天でも屋内施設充実"
-        elif indoor_ratio > 0.5:
-            return "天候に左右されにくい"
-        else:
-            return "晴天時推奨"
-
-
-# サービスのシングルトンインスタンス
-recommendation_service = RecommendationService()
+        return {
+            "service_status": {
+                "api_key_available": api_key_available,
+                "google_places_service": "operational" if api_key_available else "api_key_missing"
+            },
+            "test_results": {
+                "test_location": {
+                    "latitude": test_location.latitude,
+                    "longitude": test_location.longitude,
+                    "description": "Tokyo Station area"
+                },
+                "stations_found": len(stations),
+                "stations_sample": [
+                    {
+                        "name": s.station_name,
+                        "distance_km": s.distance_km,
+                        "types": s.lines
+                    } for s in stations[:2]
+                ],
+                "restaurants_found": len(restaurants),
+                "restaurants_sample": [
+                    {
+                        "name": r.name,
+                        "type": r.type,
+                        "cuisine_type": r.cuisine_type,
+                        "rating": r.rating,
+                        "distance_km": r.distance_from_station_km
+                    } for r in restaurants[:2]
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 @router.post(
@@ -418,4 +134,89 @@ async def get_activity_recommendations(
 ) -> ActivityRecommendationResponse:
     """アクティビティ推奨エンドポイント"""
     
-    return await recommendation_service.generate_recommendations(request)
+    return await activity_service.generate_recommendations(request)
+
+
+@router.post(
+    "/restaurant-recommendations",
+    response_model=RestaurantRecommendationResponse,
+    summary="友人向けカジュアル店舗推奨を取得",
+    description="位置情報とユーザーの希望を基に気軽に行ける店舗を2つ推奨します"
+)
+async def get_restaurant_recommendations(
+    request: RestaurantRecommendationRequest
+) -> RestaurantRecommendationResponse:
+    """カジュアル志向の友人向け店舗推奨エンドポイント"""
+    
+    try:
+        print(f"🍻 Casual restaurant recommendation request received")
+        print(f"   Location: ({request.user_location.latitude}, {request.user_location.longitude})")
+        print(f"   Activities: {[a.value for a in request.activity_type]}")
+        print(f"   Moods: {[m.value for m in request.mood]}")
+        print(f"   Group size: {request.group_size}")
+        print(f"   Casual level: {request.casual_level}")
+        print(f"   Max price per person: ¥{request.max_price_per_person}")
+        print(f"   Prefer chain stores: {request.prefer_chain_stores}")
+        print(f"   Scene type: {request.scene_type}")
+        
+        # カジュアル志向の新メソッドを使用
+        response = await restaurant_service.recommend_restaurants_async(
+            user_location=request.user_location,
+            activity_type=request.activity_type,
+            mood=request.mood,
+            group_size=request.group_size,
+            time_of_day=request.time_of_day,
+            scene_type=request.scene_type,
+            casual_level=request.casual_level.value if request.casual_level else "casual",
+            max_price_per_person=request.max_price_per_person,
+            prefer_chain_stores=request.prefer_chain_stores,
+            exclude_high_end=request.exclude_high_end,
+            # その他のパラメータ
+            station_search_radius_km=request.station_search_radius_km,
+            restaurant_search_radius_km=request.restaurant_search_radius_km,
+            max_stations=request.max_stations,
+            max_restaurants_per_station=request.max_restaurants_per_station,
+            min_rating=request.min_rating
+        )
+        
+        print(f"🎯 Casual restaurant recommendation response: success={response.success}")
+        if response.success:
+            print(f"   Recommended {len(response.recommendations)} casual restaurants")
+            print(f"   Processing time: {response.search_info.processing_time_ms}ms")
+            for i, rec in enumerate(response.recommendations):
+                print(f"   {i+1}. {rec.restaurant.name} (Score: {rec.recommendation_score}, Casual: {rec.casual_score}, Price: ¥{rec.estimated_price_per_person})")
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error in casual restaurant recommendation endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        from app.models import SearchInfo
+        return RestaurantRecommendationResponse(
+            success=False,
+            recommendations=[],
+            search_info=SearchInfo(
+                search_radius_km=0,
+                stations_searched=0,
+                total_restaurants_found=0,
+                processing_time_ms=0
+            ),
+            error_message=f"カジュアル推奨処理中にエラーが発生しました: {str(e)}"
+        )
+
+
+@router.get("/health")
+async def health_check():
+    """ヘルスチェックエンドポイント"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "services": {
+            "activity_recommendation": "available",
+            "restaurant_recommendation": "available"
+        }
+    }
+
+
