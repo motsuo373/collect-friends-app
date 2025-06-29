@@ -13,12 +13,17 @@ from app.models import (
     ActivityRecommendationResponse,
     RestaurantRecommendationRequest,
     RestaurantRecommendationResponse,
-    LocationData
+    LocationData,
+    ProposalGenerationRequest,
+    ProposalGenerationResponse,
+    UserResponseStatus
 )
 from app.services.activity_recommendation_service import ActivityRecommendationService
 from app.services.restaurant_recommendation_service import RestaurantRecommendationService
 from app.services.gemini_research import GeminiResearchAgent
 from app.services.google_places import GooglePlacesService
+from app.services.proposal_generation_service import get_proposal_generation_service
+from app.services.firestore_service import get_firestore_service
 from app.config import get_settings
 
 
@@ -215,8 +220,203 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "services": {
             "activity_recommendation": "available",
-            "restaurant_recommendation": "available"
+            "restaurant_recommendation": "available",
+            "proposal_generation": "available",
+            "firestore": "available"
         }
     }
+
+
+# ========== 提案システム関連エンドポイント ==========
+
+@router.post(
+    "/generate-ai-proposals",
+    response_model=ProposalGenerationResponse,
+    summary="AI提案を生成してFirestoreに保存",
+    description="アクティブユーザーまたは指定ユーザーに対してAI提案を生成し、Firestoreに保存します"
+)
+async def generate_ai_proposals(
+    request: ProposalGenerationRequest
+) -> ProposalGenerationResponse:
+    """AI提案生成エンドポイント"""
+    
+    try:
+        print(f"🤖 AI proposal generation request received")
+        print(f"   Target users: {request.target_user_ids if request.target_user_ids else 'All active users'}")
+        print(f"   Max proposals per user: {request.max_proposals_per_user}")
+        print(f"   Force generation: {request.force_generation}")
+        
+        proposal_service = get_proposal_generation_service()
+        response = await proposal_service.generate_ai_proposals(request)
+        
+        print(f"🎯 AI proposal generation response: success={response.success}")
+        if response.success:
+            print(f"   Generated {len(response.generated_proposals)} proposals")
+            print(f"   Target users: {response.target_users_count}")
+            print(f"   Processing time: {response.processing_time_ms}ms")
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error in AI proposal generation endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return ProposalGenerationResponse(
+            success=False,
+            generated_proposals=[],
+            target_users_count=0,
+            processing_time_ms=0,
+            error_message=f"AI提案生成中にエラーが発生しました: {str(e)}"
+        )
+
+
+@router.post(
+    "/respond-to-proposal/{proposal_id}/{user_id}",
+    summary="提案に応答",
+    description="ユーザーが提案に対して応答（参加/辞退/未定）します"
+)
+async def respond_to_proposal(
+    proposal_id: str,
+    user_id: str,
+    response_status: UserResponseStatus
+):
+    """提案応答エンドポイント"""
+    
+    try:
+        print(f"💬 Proposal response received: {user_id} -> {proposal_id} ({response_status.value})")
+        
+        firestore_service = get_firestore_service()
+        success = await firestore_service.update_proposal_response(
+            user_id, proposal_id, response_status
+        )
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"応答を更新しました: {response_status.value}",
+                "proposal_id": proposal_id,
+                "user_id": user_id,
+                "status": response_status.value,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "message": "応答の更新に失敗しました",
+                "error": "Database update failed"
+            }
+        
+    except Exception as e:
+        print(f"❌ Error in proposal response endpoint: {str(e)}")
+        return {
+            "success": False,
+            "message": f"提案応答中にエラーが発生しました: {str(e)}",
+            "error": str(e)
+        }
+
+
+@router.get(
+    "/user-proposals/{user_id}",
+    summary="ユーザーの提案一覧を取得",
+    description="指定ユーザーに届いた提案を取得します"
+)
+async def get_user_proposals(
+    user_id: str,
+    limit: int = Query(10, ge=1, le=50, description="取得件数")
+):
+    """ユーザー提案取得エンドポイント"""
+    
+    try:
+        print(f"📋 Getting proposals for user: {user_id} (limit: {limit})")
+        
+        firestore_service = get_firestore_service()
+        proposals = await firestore_service.get_user_proposals(user_id, limit)
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "proposals": proposals,
+            "count": len(proposals),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting user proposals: {str(e)}")
+        return {
+            "success": False,
+            "user_id": user_id,
+            "proposals": [],
+            "count": 0,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+@router.get(
+    "/proposal-details/{proposal_id}",
+    summary="提案の詳細を取得",
+    description="指定提案の詳細情報を取得します"
+)
+async def get_proposal_details(proposal_id: str):
+    """提案詳細取得エンドポイント"""
+    
+    try:
+        print(f"📄 Getting proposal details: {proposal_id}")
+        
+        firestore_service = get_firestore_service()
+        proposal = await firestore_service.get_proposal_details(proposal_id)
+        
+        if proposal:
+            return {
+                "success": True,
+                "proposal": proposal,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "message": "提案が見つかりませんでした",
+                "proposal_id": proposal_id
+            }
+        
+    except Exception as e:
+        print(f"❌ Error getting proposal details: {str(e)}")
+        return {
+            "success": False,
+            "message": f"提案詳細取得中にエラーが発生しました: {str(e)}",
+            "error": str(e)
+        }
+
+
+@router.post(
+    "/cleanup-expired-proposals",
+    summary="期限切れ提案をクリーンアップ",
+    description="期限切れの提案をクリーンアップします（定期実行用）"
+)
+async def cleanup_expired_proposals():
+    """期限切れ提案クリーンアップエンドポイント"""
+    
+    try:
+        print(f"🧹 Starting expired proposals cleanup...")
+        
+        firestore_service = get_firestore_service()
+        cleanup_count = await firestore_service.cleanup_expired_proposals()
+        
+        return {
+            "success": True,
+            "message": f"{cleanup_count}件の期限切れ提案をクリーンアップしました",
+            "cleanup_count": cleanup_count,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Error in cleanup expired proposals: {str(e)}")
+        return {
+            "success": False,
+            "message": f"クリーンアップ中にエラーが発生しました: {str(e)}",
+            "error": str(e),
+            "cleanup_count": 0
+        }
 
 

@@ -1,6 +1,6 @@
 import json
 import requests
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from geopy.distance import geodesic
 
 from app.config import get_settings
@@ -321,14 +321,14 @@ class GooglePlacesService:
         """
         search_types = set()
         
-        # カジュアル志向のアクティビティタイプマッピング
+        # カジュアル志向のアクティビティタイプマッピング（Google Places API (NEW) 対応）
         casual_activity_mapping = {
-            "cafe": ["cafe", "coffee_shop", "fast_food"],  # ファストカジュアルを追加
-            "drink": ["bar", "pub", "izakaya", "night_club"],  # 高級バーを除外
-            "food": ["restaurant", "meal_takeaway", "fast_food", "family_restaurant"],
-            "shopping": ["shopping_mall", "convenience_store", "supermarket"],
-            "movie": ["movie_theater"],
-            "walk": ["park", "amusement_park"]
+            "cafe": ["cafe", "restaurant"],  # coffee_shop, fast_foodは非サポート
+            "drink": ["bar", "restaurant", "karaoke"],  # pub, izakaya, night_clubは非サポート
+            "food": ["restaurant"],  # meal_takeaway, fast_food, family_restaurantは非サポート
+            "shopping": ["shopping_mall"],  # convenience_store, supermarketは制限される可能性
+            "movie": [],  # movie_theaterは非サポート
+            "walk": ["park"]  # amusement_parkは制限される可能性
         }
         
         for activity in activity_types:
@@ -338,44 +338,40 @@ class GooglePlacesService:
         # 時間帯による調整（カジュアル重視）
         if time_of_day:
             if time_of_day in ["breakfast", "brunch"]:
-                search_types.update(["cafe", "fast_food", "family_restaurant"])
+                search_types.update(["cafe", "restaurant"])
             elif time_of_day == "lunch":
-                search_types.update(["restaurant", "fast_food", "cafe", "meal_takeaway"])
+                search_types.update(["restaurant", "cafe"])
             elif time_of_day == "dinner":
-                search_types.update(["restaurant", "family_restaurant", "izakaya"])
+                search_types.update(["restaurant"])
             elif time_of_day in ["night", "late_night"]:
-                search_types.update(["bar", "pub", "izakaya", "karaoke"])
+                search_types.update(["bar", "restaurant", "karaoke"])
         
         # シーンタイプによる調整（友人向け）
         if scene_type:
             if scene_type in ["friends", "casual_meetup", "group_party"]:
-                search_types.update(["restaurant", "bar", "pub", "izakaya", "karaoke"])
-                # チェーン店優遇
+                search_types.update(["restaurant", "bar", "karaoke"])
+                # チェーン店優遇（サポートされているタイプのみ）
                 if prefer_chain_stores:
-                    search_types.update(["fast_food", "family_restaurant"])
+                    search_types.update(["restaurant", "cafe"])
             elif scene_type in ["date", "first_date"]:
                 # デートでもカジュアル寄り
-                search_types.update(["cafe", "restaurant", "family_restaurant"])
-                search_types.discard("fast_food")  # ファストフードは除外
+                search_types.update(["cafe", "restaurant"])
             elif scene_type == "family":
-                search_types.update(["family_restaurant", "cafe", "fast_food"])
+                search_types.update(["restaurant", "cafe"])
                 search_types.discard("bar")
-                search_types.discard("pub")
         
         # カジュアル度による調整
         if casual_level:
             if casual_level == "very_casual":
-                search_types.update(["fast_food", "family_restaurant", "pub", "cafe"])
+                search_types.update(["restaurant", "cafe"])
                 # 高級店系を除外
                 search_types.discard("fine_dining")
                 search_types.discard("wine_bar")
             elif casual_level == "casual":
-                search_types.update(["restaurant", "cafe", "bar", "pub"])
+                search_types.update(["restaurant", "cafe", "bar"])
             elif casual_level == "formal":
                 # フォーマルでも手頃な店舗を優先
                 search_types.update(["restaurant"])
-                search_types.discard("fast_food")
-                search_types.discard("pub")
         
         # 基本的な"restaurant"は常に含める
         search_types.add("restaurant")
@@ -647,7 +643,7 @@ class GooglePlacesService:
                 # 評価情報（シンプルな形で取得）
                 rating = place.get("rating")
                 user_ratings_total = place.get("userRatingCount")
-                price_level = place.get("priceLevel")
+                price_level = self._parse_price_level(place.get("priceLevel"))
                 
                 # 店舗タイプと料理ジャンルの判定
                 restaurant_type = self._determine_restaurant_type(place_types)
@@ -755,6 +751,28 @@ class GooglePlacesService:
             return "カフェ"
         elif any(keyword in name_lower for keyword in ["bar", "バー", "居酒屋"]):
             return "バー・居酒屋"
+        
+        return None
+    
+    def _parse_price_level(self, price_level_value: Any) -> Optional[int]:
+        """Google Places API (NEW)の価格レベルを整数に変換"""
+        if not price_level_value:
+            return None
+        
+        # 既に整数の場合はそのまま返す
+        if isinstance(price_level_value, int):
+            return price_level_value
+        
+        # 文字列の場合は変換
+        if isinstance(price_level_value, str):
+            price_mapping = {
+                'PRICE_LEVEL_FREE': 0,
+                'PRICE_LEVEL_INEXPENSIVE': 1,
+                'PRICE_LEVEL_MODERATE': 2,
+                'PRICE_LEVEL_EXPENSIVE': 3,
+                'PRICE_LEVEL_VERY_EXPENSIVE': 4
+            }
+            return price_mapping.get(price_level_value, 2)  # デフォルトは2（中程度）
         
         return None
     

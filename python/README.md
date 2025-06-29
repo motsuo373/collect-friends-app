@@ -10,6 +10,10 @@
 - ⚡ 並列処理による高速レスポンス
 - 💾 Redisキャッシュによる効率化
 - 👥 グループの人数・気分・予算に応じた最適化
+- 🔥 **Firestore連携によるAI提案システム**
+- 📱 **ユーザー状況に基づく自動提案生成**
+- ⏰ **Cloud Schedulerによる定期実行**
+- 🏷️ **提案の管理・応答機能**
 
 ## セットアップ
 
@@ -292,6 +296,10 @@ REDIS_URL=redis://redis:6379
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 REDIS_HOST=your-redis-ip-address
 REDIS_PORT=6379
+
+# Firebase/Firestore設定（必須）
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"your-project"...}
+# または Cloud Run環境ではデフォルト認証を使用（FIREBASE_SERVICE_ACCOUNT_KEYが未設定の場合）
 ```
 
 ### APIキーの取得方法
@@ -319,6 +327,159 @@ LOG_LEVEL=INFO
 ```
 
 **注意**: Places API (NEW) を使用しているため、従来のPlaces APIとは異なるAPIキーが必要です。
+
+---
+
+## 🔥 AI提案システム
+
+### AI提案生成の取得
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/generate-ai-proposals" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_user_ids": ["user123", "user456"],
+    "max_proposals_per_user": 3,
+    "force_generation": false,
+    "location_filter": {
+      "center_lat": 35.6762,
+      "center_lng": 139.6503,
+      "radius_km": 10
+    }
+  }'
+```
+
+#### AI提案生成レスポンス例
+
+```json
+{
+  "success": true,
+  "generated_proposals": [
+    "proposal_a1b2c3d4e5f6",
+    "proposal_f6e5d4c3b2a1"
+  ],
+  "target_users_count": 2,
+  "processing_time_ms": 3500
+}
+```
+
+### ユーザーの提案一覧を取得
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/user-proposals/user123?limit=10"
+```
+
+#### レスポンス例
+
+```json
+{
+  "success": true,
+  "user_id": "user123",
+  "proposals": [
+    {
+      "proposal_id": "proposal_a1b2c3d4e5f6",
+      "proposal_ref": "proposals/proposal_a1b2c3d4e5f6",
+      "status": "pending",
+      "is_read": false,
+      "priority": 0.85,
+      "received_at": "2024-06-29T09:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+### 提案に応答
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/respond-to-proposal/proposal_a1b2c3d4e5f6/user123" \
+  -H "Content-Type: application/json" \
+  -d '"accepted"'
+```
+
+#### 利用可能な応答ステータス
+- `pending`: 未回答（デフォルト）
+- `accepted`: 参加したい
+- `declined`: 参加しない
+- `maybe`: 検討中・未定
+
+### 提案の詳細を取得
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/proposal-details/proposal_a1b2c3d4e5f6"
+```
+
+#### レスポンス例
+
+```json
+{
+  "success": true,
+  "proposal": {
+    "proposal_id": "proposal_a1b2c3d4e5f6",
+    "title": "渋谷で飲み会",
+    "description": "焼肉居酒屋Kanjie 渋谷店で飲み会はいかがですか？",
+    "type": "venue_recommendation",
+    "proposal_source": "ai",
+    "scheduled_at": "2024-06-29T18:00:00Z",
+    "location": {
+      "name": "焼肉居酒屋Kanjie 渋谷店",
+      "address": "東京都渋谷区...",
+      "coordinates": {"lat": 35.6580, "lng": 139.7016},
+      "rating": 4.2
+    },
+    "budget": {
+      "min": 2000,
+      "max": 4000,
+      "currency": "JPY",
+      "per_person": true
+    },
+    "invited_users": [
+      {
+        "uid": "user456",
+        "display_name": "Aさん",
+        "role": "participant"
+      }
+    ],
+    "response_count": {
+      "accepted": 0,
+      "declined": 0,
+      "pending": 2
+    }
+  }
+}
+```
+
+### 期限切れ提案のクリーンアップ
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/cleanup-expired-proposals"
+```
+
+---
+
+## ⏰ Cloud Scheduler設定
+
+AI提案は自動的に以下のスケジュールで生成されます：
+
+- **朝（9:00）**: ユーザーあたり2提案
+- **昼（13:00）**: ユーザーあたり2提案  
+- **夕方（17:00）**: ユーザーあたり3提案
+- **深夜（1:00）**: 期限切れ提案のクリーンアップ
+
+### スケジューラーの手動設定
+
+```bash
+# scheduler-config.yamlの設定値を更新
+# YOUR_CLOUD_RUN_URLを実際のURLに変更
+
+# スケジューラージョブの作成
+gcloud scheduler jobs create http ai-proposal-generation-morning \
+  --schedule="0 9 * * *" \
+  --uri="https://your-cloud-run-url/api/v1/generate-ai-proposals" \
+  --http-method=POST \
+  --message-body='{"max_proposals_per_user": 2, "force_generation": false}' \
+  --headers="Content-Type=application/json"
+```
 
 ## テスト
 

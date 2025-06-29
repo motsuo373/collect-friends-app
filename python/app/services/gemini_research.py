@@ -159,6 +159,10 @@ class GeminiResearchAgent:
                 error_msg += f" (Check GOOGLE_CLOUD_PROJECT={self.settings.GOOGLE_CLOUD_PROJECT})"
             raise GeminiAPIError(error_msg)
     
+    async def generate_content_async(self, prompt: str, model_name: Optional[str] = None) -> str:
+        """一般的なコンテンツ生成メソッド（レストラン推薦サービス用）"""
+        return await self._call_gemini_async(prompt)
+    
     def _parse_research_response(
         self,
         response_text: str,

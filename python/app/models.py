@@ -382,3 +382,179 @@ class RestaurantRecommendationResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="エラーメッセージ")
 
 
+# ========== Firestore用提案システムモデル ==========
+
+class ProposalSource(str, Enum):
+    """提案元"""
+    USER = "user"
+    AI = "ai"
+    FRIEND_INVITE = "friend_invite"
+
+
+class ProposalType(str, Enum):
+    """提案種類"""
+    GROUP_MEETUP = "group_meetup"
+    VENUE_RECOMMENDATION = "venue_recommendation"
+    ACTIVITY_SUGGESTION = "activity_suggestion"
+
+
+class ProposalStatus(str, Enum):
+    """提案状態"""
+    ACTIVE = "active"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+    COMPLETED = "completed"
+
+
+class UserResponseStatus(str, Enum):
+    """ユーザー応答状況"""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    MAYBE = "maybe"
+
+
+class Priority(str, Enum):
+    """優先度"""
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class ProposalLocation(BaseModel):
+    """提案場所情報"""
+    name: str = Field(..., description="場所名")
+    address: str = Field(..., description="住所")
+    coordinates: Dict[str, float] = Field(..., description="座標 {lat: float, lng: float}")
+    place_id: Optional[str] = Field(None, description="Google Places ID")
+    category: str = Field(..., description="カテゴリー")
+    phone: Optional[str] = Field(None, description="電話番号")
+    website: Optional[str] = Field(None, description="ウェブサイト")
+    price_level: Optional[int] = Field(None, description="価格レベル（1-4）")
+    rating: Optional[float] = Field(None, description="評価")
+    photos: Optional[List[str]] = Field(None, description="写真URL配列")
+
+
+class InvitedUser(BaseModel):
+    """招待ユーザー情報"""
+    uid: str = Field(..., description="ユーザーUID")
+    display_name: str = Field(..., description="表示名")
+    profile_image: Optional[str] = Field(None, description="プロフィール画像URL")
+    role: str = Field("participant", description="役割")
+    invited_at: datetime = Field(..., description="招待日時")
+    invited_by: Optional[str] = Field(None, description="招待者のUID")
+
+
+class ProposalBudget(BaseModel):
+    """予算情報"""
+    min: int = Field(..., description="最小金額")
+    max: int = Field(..., description="最大金額")
+    currency: str = Field("JPY", description="通貨")
+    per_person: bool = Field(True, description="一人当たりかどうか")
+    includes_food: bool = Field(True, description="食事込みかどうか")
+    includes_drinks: bool = Field(True, description="飲み物込みかどうか")
+    notes: Optional[str] = Field(None, description="備考")
+
+
+class ProposalCapacity(BaseModel):
+    """参加人数情報"""
+    min: int = Field(..., description="最少人数")
+    max: int = Field(..., description="最大人数")
+    current: int = Field(0, description="現在の応答済み人数")
+    waiting_list: int = Field(0, description="待機リスト人数")
+
+
+class AIAnalysis(BaseModel):
+    """AI分析データ"""
+    confidence: float = Field(..., ge=0, le=1, description="信頼度")
+    matching_score: float = Field(..., ge=0, le=1, description="マッチングスコア")
+    reasons: List[str] = Field(..., description="推薦理由")
+    recommendation_basis: List[str] = Field(..., description="推薦根拠")
+    success_probability: float = Field(..., ge=0, le=1, description="成功確率")
+    alternative_venues: Optional[List[str]] = Field(None, description="代替候補")
+    suggested_time: Optional[datetime] = Field(None, description="推奨時間")
+    factors_considered: Dict[str, bool] = Field(..., description="考慮された要因")
+
+
+class UserResponse(BaseModel):
+    """ユーザー応答情報"""
+    status: UserResponseStatus = Field(..., description="応答状況")
+    responded_at: Optional[datetime] = Field(None, description="応答日時")
+
+
+class ResponseCount(BaseModel):
+    """応答集計"""
+    accepted: int = Field(0, description="参加希望者数")
+    declined: int = Field(0, description="参加拒否者数")
+    pending: int = Field(0, description="未回答者数")
+    maybe: int = Field(0, description="検討中者数")
+
+
+class Proposal(BaseModel):
+    """提案データ（Firestore proposals コレクション用）"""
+    proposal_id: str = Field(..., description="提案ID")
+    title: str = Field(..., description="提案タイトル")
+    description: str = Field(..., description="提案詳細")
+    type: ProposalType = Field(..., description="提案種類")
+    proposal_source: ProposalSource = Field(..., description="提案元")
+    creator_ref: Optional[str] = Field(None, description="作成者UID（ユーザー提案の場合）")
+    creator_display_name: Optional[str] = Field(None, description="作成者表示名")
+    target_users: List[str] = Field(..., description="対象ユーザーUID配列")
+    invited_users: List[InvitedUser] = Field(..., description="招待ユーザー詳細")
+    scheduled_at: datetime = Field(..., description="予定日時")
+    end_time: Optional[datetime] = Field(None, description="終了予定時間")
+    location: ProposalLocation = Field(..., description="場所情報")
+    category: str = Field(..., description="カテゴリー")
+    budget: ProposalBudget = Field(..., description="予算情報")
+    capacity: ProposalCapacity = Field(..., description="参加人数情報")
+    requirements: Optional[List[str]] = Field(None, description="参加条件")
+    tags: Optional[List[str]] = Field(None, description="タグ")
+    ai_analysis: Optional[AIAnalysis] = Field(None, description="AI分析データ")
+    responses: Dict[str, UserResponse] = Field(default_factory=dict, description="ユーザー応答状況")
+    response_count: ResponseCount = Field(default_factory=ResponseCount, description="応答集計")
+    status: ProposalStatus = Field(ProposalStatus.ACTIVE, description="提案状態")
+    priority: Priority = Field(Priority.NORMAL, description="優先度")
+    is_public: bool = Field(False, description="公開提案かどうか")
+    allow_invites: bool = Field(True, description="参加者が他の人を招待できるか")
+    auto_confirm: bool = Field(False, description="自動確定するか")
+    confirmation_deadline: Optional[datetime] = Field(None, description="確定期限")
+    expires_at: datetime = Field(..., description="提案有効期限")
+    related_event_ref: Optional[str] = Field(None, description="関連イベント参照")
+    related_chat_ref: Optional[str] = Field(None, description="関連チャット参照")
+    created_at: datetime = Field(default_factory=datetime.now, description="作成日時")
+    updated_at: datetime = Field(default_factory=datetime.now, description="更新日時")
+
+
+class UserProposal(BaseModel):
+    """ユーザー個別提案（Firestore userProposal サブコレクション用）"""
+    proposal_id: str = Field(..., description="提案ID")
+    proposal_ref: str = Field(..., description="proposals コレクションへの参照パス")
+    status: UserResponseStatus = Field(UserResponseStatus.PENDING, description="応答状況")
+    is_read: bool = Field(False, description="既読フラグ")
+    responded_at: Optional[datetime] = Field(None, description="応答日時")
+    notification_sent: bool = Field(False, description="通知送信済みフラグ")
+    personal_note: Optional[str] = Field(None, description="個人メモ")
+    priority: float = Field(0.0, description="このユーザーにとっての優先度")
+    received_at: datetime = Field(default_factory=datetime.now, description="受信日時")
+    updated_at: datetime = Field(default_factory=datetime.now, description="更新日時")
+
+
+class ProposalGenerationRequest(BaseModel):
+    """AI提案生成リクエスト"""
+    target_user_ids: Optional[List[str]] = Field(None, description="対象ユーザーID（未指定の場合は全アクティブユーザー）")
+    location_filter: Optional[Dict[str, Any]] = Field(None, description="位置フィルター")
+    force_generation: bool = Field(False, description="強制生成フラグ")
+    max_proposals_per_user: int = Field(3, ge=1, le=10, description="ユーザーあたり最大提案数")
+
+
+class ProposalGenerationResponse(BaseModel):
+    """AI提案生成レスポンス"""
+    success: bool = Field(..., description="成功フラグ")
+    generated_proposals: List[str] = Field(..., description="生成された提案ID配列")
+    target_users_count: int = Field(..., description="対象ユーザー数")
+    processing_time_ms: int = Field(..., description="処理時間（ミリ秒）")
+    error_message: Optional[str] = Field(None, description="エラーメッセージ")
+
+
