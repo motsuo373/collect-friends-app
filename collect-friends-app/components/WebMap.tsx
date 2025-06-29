@@ -136,10 +136,10 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
         border-color: #FF8700;
       }
       
-      .nearby-user-marker {
+      .friend-marker {
         width: 36px;
         height: 36px;
-        border-color: #ea4335;
+        border-color: #FFB366;
       }
       
       .custom-marker svg {
@@ -153,8 +153,8 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
         color: #FF8700;
       }
       
-      .nearby-user-marker svg {
-        color: #ea4335;
+      .friend-marker svg {
+        color: #FFB366;
       }
     `;
     document.head.appendChild(style);
@@ -169,10 +169,14 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
     : [35.6762, 139.6503]; // 東京駅
 
   // Lucideアイコンを使用したカスタムマーカーアイコンの作成
-  const createCustomIcon = (isUser = false) => {
-    const className = isUser ? 'user-marker' : 'nearby-user-marker';
+  const createCustomIcon = (isUser = false, isAvailable = true) => {
+    const className = isUser ? 'user-marker' : 'friend-marker';
     const size = isUser ? 44 : 36;
-    const iconColor = isUser ? '#FF8700' : '#ea4335';
+    
+    // ユーザーのマーカーはメインオレンジ、友達は薄いオレンジ
+    const iconColor = isUser 
+      ? '#FF8700' 
+      : isAvailable ? '#FFB366' : '#FFCC99'; // 暇な友達は少し濃い薄オレンジ、忙しい友達はもっと薄いオレンジ
     
     // SVGアイコンを作成
     const iconSvg = isUser 
@@ -244,9 +248,6 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
             <Marker
               position={[userLocation.latitude, userLocation.longitude]}
               icon={createCustomIcon(true)}
-              eventHandlers={{
-                click: onStatusPress,
-              }}
             >
               <Popup>
                 <div style={{ textAlign: 'center', minWidth: '150px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -255,7 +256,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
                   <button
                     onClick={onStatusPress}
                     style={{
-                      background: '#1a73e8',
+                      background: '#FF8700',
                       color: 'white',
                       border: 'none',
                       padding: '8px 16px',
@@ -263,6 +264,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
                       fontSize: '14px',
                       cursor: 'pointer',
                       fontWeight: '500',
+                      boxShadow: '0 2px 4px rgba(255, 135, 0, 0.3)',
                     }}
                   >
                     ステータス変更
@@ -286,13 +288,13 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
           </>
         )}
 
-        {/* 近くのユーザーのマーカー */}
+        {/* 友達のマーカー */}
         {nearbyUsers.map((user) => {
           return (
             <Marker
               key={user.uid}
               position={[user.location.latitude, user.location.longitude]}
-              icon={createCustomIcon(false)}
+              icon={createCustomIcon(false, user.status.isAvailable)}
               eventHandlers={{
                 click: () => onUserPress?.(user),
               }}
@@ -314,7 +316,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
                     <button
                       onClick={() => onUserPress(user)}
                       style={{
-                        background: '#34a853',
+                        background: '#FFB366',
                         color: 'white',
                         border: 'none',
                         padding: '8px 16px',
@@ -322,6 +324,7 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
                         fontSize: '14px',
                         cursor: 'pointer',
                         fontWeight: '500',
+                        boxShadow: '0 2px 4px rgba(255, 179, 102, 0.3)',
                       }}
                     >
                       話しかける

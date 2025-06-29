@@ -7,138 +7,21 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
-import { Filter, X, Coffee, Wine, Compass, ShoppingBag, Play, Utensils, Check, CircleCheckBig } from 'lucide-react-native';
+import { Filter, X, Coffee, Wine, Compass, ShoppingBag, Play, Utensils, Check, CircleCheckBig, RefreshCw } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import tw from 'twrnc';
 import { useColorScheme } from '@/hooks/useColorScheme';
-
-interface Friend {
-  id: string;
-  name: string;
-  profileImage?: string;
-  isAvailableNow: boolean;
-  isWithinWalkingDistance: boolean;
-  interests: string[];
-  lastSeen?: string;
-  age?: number;
-  occupation?: string;
-  favoriteSpots?: string[];
-  availabilityStatus?: 'now' | 'evening' | 'tomorrow_morning' | 'tomorrow_evening';
-  activities?: string[];
-  maxDistance?: number; // 徒歩分数
-}
+import { useFriends, type FriendData } from '@/hooks/useFriends';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FilterState {
   availabilityStatus: string[];
   activities: string[];
 }
-
-// モックデータ
-const mockFriends: Friend[] = [
-  {
-    id: '1',
-    name: '田中 花子',
-    isAvailableNow: true,
-    isWithinWalkingDistance: true,
-    interests: ['カフェ', '散歩', '写真'],
-    lastSeen: '2分前',
-    availabilityStatus: 'now',
-    activities: ['cafe'],
-  },
-  {
-    id: '2',
-    name: '佐藤 健太',
-    isAvailableNow: false,
-    isWithinWalkingDistance: true,
-    interests: ['映画', 'ゲーム', 'アニメ'],
-    lastSeen: '30分前',
-    availabilityStatus: 'evening',
-    activities: ['drink', 'movie'],
-  },
-  {
-    id: '3',
-    name: '鈴木 美咲',
-    isAvailableNow: true,
-    isWithinWalkingDistance: false,
-    interests: ['読書', 'カフェ', 'ヨガ'],
-    lastSeen: '1時間前',
-    availabilityStatus: 'now',
-    activities: ['cafe', 'walk'],
-  },
-  {
-    id: '4',
-    name: '高橋 拓也',
-    isAvailableNow: true,
-    isWithinWalkingDistance: true,
-    interests: ['料理', 'ショッピング', 'グルメ'],
-    lastSeen: '5分前',
-    availabilityStatus: 'now',
-    activities: ['lunch', 'shopping'],
-  },
-  {
-    id: '5',
-    name: '山田 ゆい',
-    isAvailableNow: false,
-    isWithinWalkingDistance: true,
-    interests: ['スポーツ', 'フィットネス', '健康'],
-    lastSeen: '15分前',
-    availabilityStatus: 'tomorrow_morning',
-    activities: ['cafe', 'walk'],
-  },
-  {
-    id: '6',
-    name: '伊藤 慎一',
-    isAvailableNow: true,
-    isWithinWalkingDistance: false,
-    interests: ['音楽', 'アート', 'ライブ'],
-    lastSeen: '45分前',
-    availabilityStatus: 'now',
-    activities: ['drink'],
-  },
-  {
-    id: '7',
-    name: '渡辺 さくら',
-    isAvailableNow: true,
-    isWithinWalkingDistance: true,
-    interests: ['旅行', '写真', 'カフェ巡り'],
-    lastSeen: '10分前',
-    availabilityStatus: 'now',
-    activities: ['cafe', 'walk'],
-  },
-  {
-    id: '8',
-    name: '木村 大輔',
-    isAvailableNow: false,
-    isWithinWalkingDistance: false,
-    interests: ['ビジネス', 'ネットワーキング', 'セミナー'],
-    lastSeen: '2時間前',
-    availabilityStatus: 'tomorrow_evening',
-    activities: ['drink', 'lunch'],
-  },
-  {
-    id: '9',
-    name: '松本 あやな',
-    isAvailableNow: true,
-    isWithinWalkingDistance: true,
-    interests: ['美容', 'ファッション', 'ショッピング'],
-    lastSeen: '3分前',
-    availabilityStatus: 'now',
-    activities: ['shopping', 'cafe'],
-  },
-  {
-    id: '10',
-    name: '中村 雄介',
-    isAvailableNow: false,
-    isWithinWalkingDistance: true,
-    interests: ['お酒', 'グルメ', '居酒屋'],
-    lastSeen: '1時間前',
-    availabilityStatus: 'evening',
-    activities: ['drink', 'lunch'],
-  },
-];
 
 const activityOptions = [
   { key: 'cafe', label: 'お茶・カフェ', IconComponent: Coffee },
@@ -149,8 +32,19 @@ const activityOptions = [
   { key: 'lunch', label: '軽食・ランチ', IconComponent: Utensils },
 ];
 
+// availabilityStatusをcurrentStatusとisOnlineから導出する関数
+const getAvailabilityStatus = (friend: FriendData): string => {
+  if (friend.currentStatus === 'free' && friend.isOnline) return 'now';
+  if (friend.currentStatus === 'free' && !friend.isOnline) return 'evening';
+  if (friend.currentStatus === 'busy') return 'tomorrow_morning';
+  return 'tomorrow_evening';
+};
+
 export default function FriendsScreen() {
   const colorScheme = useColorScheme();
+  const { user } = useAuth();
+  const { friends, loading, error, refetch } = useFriends(user?.uid || null);
+  
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [isInviteSuccessModalVisible, setIsInviteSuccessModalVisible] = useState(false);
@@ -159,10 +53,11 @@ export default function FriendsScreen() {
     activities: [],
   });
 
-  const filteredFriends = mockFriends.filter(friend => {
+  const filteredFriends = friends.filter(friend => {
     // 利用可能性フィルター
     if (filters.availabilityStatus.length > 0) {
-      if (!filters.availabilityStatus.includes(friend.availabilityStatus || '')) {
+      const friendAvailabilityStatus = getAvailabilityStatus(friend);
+      if (!filters.availabilityStatus.includes(friendAvailabilityStatus)) {
         return false;
       }
     }
@@ -250,7 +145,56 @@ export default function FriendsScreen() {
     }
   };
 
+  // ローディング表示
+  if (loading) {
     return (
+      <SafeAreaView style={tw`flex-1 bg-[#F5F5F5] justify-center items-center`}>
+        <ActivityIndicator size="large" color="#FF7300" />
+        <Text style={tw`text-gray-600 mt-4 text-base`}>友達データを読み込み中...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // エラー表示
+  if (error) {
+    return (
+      <SafeAreaView style={tw`flex-1 bg-[#F5F5F5] justify-center items-center px-4`}>
+        <Text style={tw`text-red-600 text-center text-base mb-4`}>
+          {error}
+        </Text>
+        <TouchableOpacity
+          style={tw`bg-[#FF7300] px-6 py-3 rounded-xl flex-row items-center`}
+          onPress={refetch}
+        >
+          <RefreshCw size={20} color="white" style={tw`mr-2`} />
+          <Text style={tw`text-white font-semibold`}>再試行</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // 友達がいない場合
+  if (friends.length === 0) {
+    return (
+      <SafeAreaView style={tw`flex-1 bg-[#F5F5F5] justify-center items-center px-4`}>
+        <Text style={tw`text-gray-600 text-center text-lg mb-2`}>
+          まだ友達がいません
+        </Text>
+        <Text style={tw`text-gray-500 text-center text-base mb-6`}>
+          設定画面から「仮の友達を作る」ボタンで{'\n'}テストデータを追加してみてください
+        </Text>
+        <TouchableOpacity
+          style={tw`bg-[#FF7300] px-6 py-3 rounded-xl flex-row items-center`}
+          onPress={refetch}
+        >
+          <RefreshCw size={20} color="white" style={tw`mr-2`} />
+          <Text style={tw`text-white font-semibold`}>更新</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  return (
     <SafeAreaView style={tw`flex-1 bg-[#F5F5F5]`}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
@@ -327,10 +271,10 @@ export default function FriendsScreen() {
                 <View style={tw`mr-3 relative`}>
                   <View style={[
                     tw`w-12 h-12 rounded-full items-center justify-center`,
-                    { backgroundColor: getProfileBackgroundColor(friend.name) }
+                    { backgroundColor: getProfileBackgroundColor(friend.displayName) }
                   ]}>
                     <Text style={tw`text-lg font-semibold text-white`}>
-                      {friend.name.split(' ').map(n => n[0]).join('')}
+                      {friend.displayName.split(' ').map(n => n[0]).join('')}
                     </Text>
                   </View>
                   {friend.isAvailableNow && (
@@ -339,7 +283,12 @@ export default function FriendsScreen() {
                 </View>
                 
                 <View style={tw`flex-1`}>
-                  <Text style={tw`text-base font-semibold text-[#333333] mb-0.5`}>{friend.name}</Text>
+                  <Text style={tw`text-base font-semibold text-[#333333] mb-0.5`}>{friend.displayName}</Text>
+                  
+                  {/* カスタムメッセージがある場合は表示 */}
+                  {friend.customMessage && (
+                    <Text style={tw`text-sm text-[#666666] mb-1`}>&quot;{friend.customMessage}&quot;</Text>
+                  )}
                   
                   {/* アクティビティラベル */}
                   {friend.activities && friend.activities.length > 0 && (
@@ -420,8 +369,6 @@ export default function FriendsScreen() {
   );
 }
 
-
-
 // フィルターモーダルコンポーネント
 interface FilterModalProps {
   visible: boolean;
@@ -451,8 +398,6 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, filters, on
       : [...filters.activities, activity];
     onFiltersChange({ ...filters, activities: newActivities });
   };
-
-
 
   const clearAllFilters = () => {
     onFiltersChange({ availabilityStatus: [], activities: [] });
@@ -498,61 +443,58 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, filters, on
             </View>
           </View>
 
-          {/* やりたいこと */}
+          {/* 何したい？ */}
           <View style={tw`mb-8`}>
-            <ThemedText type="subtitle">やりたいこと</ThemedText>
-            <View style={tw`flex-row flex-wrap mt-3 -m-1.5`}>
-              {activityOptions.map((activity) => (
-                <TouchableOpacity
-                  key={activity.key}
-                  style={[
-                    tw`w-[30%] bg-gray-100 rounded-2xl justify-center items-center p-2 m-1.5`,
-                    { height: 60 },
-                    filters.activities.includes(activity.key) && [
-                      tw`border-2 border-orange-500`,
-                      { backgroundColor: '#FFF' }
-                    ],
-                  ]}
-                  onPress={() => toggleActivityFilter(activity.key)}
-                >
-                  <activity.IconComponent 
-                    size={18} 
-                    color={filters.activities.includes(activity.key) ? '#FF8700' : '#666'} 
-                  />
-                  <Text style={[
-                    tw`text-xs text-center mt-1 font-medium`,
-                    filters.activities.includes(activity.key) ? tw`text-orange-500 font-bold` : tw`text-gray-600`,
-                  ]}>
-                    {activity.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <ThemedText type="subtitle">何したい？</ThemedText>
+            <View style={tw`flex-row flex-wrap mt-3 -m-1`}>
+              {activityOptions.map((option) => {
+                const IconComponent = option.IconComponent;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      tw`flex-1 min-w-[45%] py-3 px-4 bg-gray-100 rounded-xl items-center m-1`,
+                      filters.activities.includes(option.key) && [
+                        tw`border-2 border-orange-500`,
+                        { backgroundColor: '#FFF' }
+                      ],
+                    ]}
+                    onPress={() => toggleActivityFilter(option.key)}
+                  >
+                    <IconComponent 
+                      size={24} 
+                      color={filters.activities.includes(option.key) ? "#FF7300" : "#666"} 
+                      style={tw`mb-1`}
+                    />
+                    <Text style={[
+                      tw`text-gray-600 font-medium text-xs`,
+                      filters.activities.includes(option.key) && tw`text-orange-500 font-bold`,
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </ScrollView>
 
-        <View style={tw`p-5 pb-10`}>
+        {/* フィルターリセット & 適用ボタン */}
+        <View style={tw`p-5 pt-0 pb-8`}>
           {hasAnyFilters && (
-            <TouchableOpacity onPress={clearAllFilters} style={tw`mb-3`}>
-              <View style={tw`py-4 rounded-xl border border-gray-300 bg-white`}>
-                <Text style={tw`text-gray-600 text-base font-medium text-center`}>
-                  フィルターをクリア
-                </Text>
-              </View>
+            <TouchableOpacity 
+              style={tw`border border-gray-300 rounded-xl py-3 mb-3 items-center`}
+              onPress={clearAllFilters}
+            >
+              <Text style={tw`text-gray-600 font-medium`}>全てリセット</Text>
             </TouchableOpacity>
           )}
           
-          <TouchableOpacity onPress={onClose}>
-            <LinearGradient
-              colors={['#FF7300', '#FF9C00']}
-              style={tw`py-4 rounded-xl`}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={tw`text-white text-base font-semibold text-center`}>
-                フィルターを適用
-              </Text>
-            </LinearGradient>
+          <TouchableOpacity 
+            style={tw`bg-[#FF7300] rounded-xl py-4 items-center`}
+            onPress={onClose}
+          >
+            <Text style={tw`text-white font-semibold text-lg`}>適用</Text>
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -568,36 +510,22 @@ interface InviteSuccessModalProps {
 
 const InviteSuccessModal: React.FC<InviteSuccessModalProps> = ({ visible, onClose }) => {
   return (
-    <Modal 
-      visible={visible} 
-      transparent={true} 
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity 
-        style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center`} 
-        activeOpacity={1} 
-        onPress={onClose}
-      >
-        <View style={[
-          tw`bg-white rounded-2xl py-10 px-12 items-center`,
-          {
-            shadowColor: '#000',
-            shadowOffset: {
-              width: 0,
-              height: 10,
-            },
-            shadowOpacity: 0.25,
-            shadowRadius: 20,
-            elevation: 20,
-          }
-        ]}>
-          <View style={tw`w-20 h-20 rounded-full bg-[#FFF0E5] justify-center items-center mb-5`}>
-            <CircleCheckBig size={60} color="#FF7300" />
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-8`}>
+        <View style={tw`bg-white rounded-2xl p-8 items-center max-w-80 w-full`}>
+          <View style={tw`w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4`}>
+            <CircleCheckBig size={32} color="#22C55E" />
           </View>
-          <Text style={tw`text-lg font-semibold text-[#FF7300]`}>誘いました</Text>
+          
+          <Text style={tw`text-xl font-bold text-gray-800 mb-2 text-center`}>
+            招待を送信しました！
+          </Text>
+          
+          <Text style={tw`text-gray-600 text-center leading-5`}>
+            友達に通知が届きました。{'\n'}返事を待ちましょう。
+          </Text>
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 };

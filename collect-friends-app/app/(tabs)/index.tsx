@@ -15,6 +15,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/contexts/AuthContext';
 import { setDocument, getDocument, updateDocument } from '@/utils/firestoreService';
 import { LocationService } from '@/utils/locationService';
+import { useFriends, FriendData } from '@/hooks/useFriends';
 import tw from 'twrnc';
 
 // Dynamic import for web only
@@ -24,6 +25,87 @@ interface UserLocation {
   latitude: number;
   longitude: number;
 }
+
+// WebMapのNearbyUser型に合わせた型定義
+interface NearbyUser {
+  uid: string;
+  name: string;
+  distance: number;
+  status: {
+    isAvailable: boolean;
+    activities: string[];
+    moveRange: number;
+  };
+  location: {
+    latitude: number;
+    longitude: number;
+    accuracy: 'exact' | 'approximate' | 'area';
+  };
+  shareLevel: 'detailed' | 'approximate' | 'hidden';
+}
+
+// FriendDataをNearbyUserに変換するユーティリティ関数
+const convertFriendToNearbyUser = (friend: FriendData, userLocation: UserLocation | null): NearbyUser | null => {
+  // 位置情報がない友達は表示しない
+  if (!friend.sharedLocation?.coordinates) {
+    return null;
+  }
+
+  // 距離を計算（簡易実装）
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371e3; // メートル
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lng2-lng1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+  };
+
+  const distance = userLocation 
+    ? calculateDistance(
+        userLocation.latitude, 
+        userLocation.longitude,
+        friend.sharedLocation.coordinates.lat,
+        friend.sharedLocation.coordinates.lng
+      )
+    : 0;
+
+  // 共有レベルに応じた位置精度を決定
+  const getLocationAccuracy = (level: number): 'exact' | 'approximate' | 'area' => {
+    if (level === 1) return 'exact';
+    if (level === 2) return 'approximate';
+    return 'area';
+  };
+
+  const getShareLevel = (level: number): 'detailed' | 'approximate' | 'hidden' => {
+    if (level <= 1) return 'detailed';
+    if (level === 2) return 'approximate';
+    return 'hidden';
+  };
+
+  return {
+    uid: friend.friendUid,
+    name: friend.displayName,
+    distance: Math.round(distance),
+    status: {
+      isAvailable: friend.isAvailableNow,
+      activities: friend.activities,
+      moveRange: 1000, // デフォルト値
+    },
+    location: {
+      latitude: friend.sharedLocation.coordinates.lat,
+      longitude: friend.sharedLocation.coordinates.lng,
+      accuracy: getLocationAccuracy(friend.sharedLocation.level),
+    },
+    shareLevel: getShareLevel(friend.sharedLocation.level),
+  };
+};
 
 // UserStatusをFirestoreの構造に変換する関数（他のコンポーネントでも使用可能）
 export const convertUserStatusToFirestore = (status: UserStatus) => {
@@ -92,6 +174,16 @@ function WebHomeScreen() {
   const [webMapLoaded, setWebMapLoaded] = useState(false);
   const webMapRef = useRef<any>(null);
   const locationService = LocationService.getInstance();
+  
+  // 友達データを取得
+  const { friends, loading: friendsLoading, error: friendsError } = useFriends(user?.uid || null);
+
+  // 友達データをNearbyUser形式に変換
+  const nearbyFriends: NearbyUser[] = React.useMemo(() => {
+    return friends
+      .map(friend => convertFriendToNearbyUser(friend, userLocation))
+      .filter((friend): friend is NearbyUser => friend !== null);
+  }, [friends, userLocation]);
 
   // Web用マップコンポーネントの動的読み込み
   useEffect(() => {
@@ -311,6 +403,23 @@ function WebHomeScreen() {
     return `${availabilityText} ${activityText}`;
   };
 
+  const handleUserPress = (user: NearbyUser) => {
+    Alert.alert(
+      `${user.name}さん`,
+      `距離: ${user.distance < 1000 ? user.distance + 'm' : (user.distance / 1000).toFixed(1) + 'km'}\nステータス: ${user.status.activities.join('、') || '暇している'}`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { 
+          text: '話しかける', 
+          onPress: () => {
+            // TODO: チャット画面に遷移（友達テーマカラー: #FFB366を将来的に適用）
+            console.log('チャット開始:', user.uid);
+          }
+        }
+      ]
+    );
+  };
+
   if (loading || !webMapLoaded) {
     return (
       <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100`}>
@@ -355,7 +464,9 @@ function WebHomeScreen() {
             ref={webMapRef}
             userLocation={userLocation}
             userStatus={userStatus}
+            nearbyUsers={nearbyFriends}
             onStatusPress={() => setStatusModalVisible(true)}
+            onUserPress={handleUserPress}
           />
         )}
       </div>
@@ -386,8 +497,6 @@ function WebHomeScreen() {
           >
             <Ionicons name="locate" size={24} color="#FF8700" />
           </TouchableOpacity>
-
-
         </View>
       </SafeAreaView>
 
@@ -397,6 +506,13 @@ function WebHomeScreen() {
         onSave={handleStatusSave}
         currentStatus={userStatus}
       />
+
+      {/* 友達エラー表示（デバッグ用） */}
+      {friendsError && (
+        <View style={[tw`absolute top-20 left-4 right-4 p-3 rounded-lg`, { backgroundColor: 'rgba(255, 204, 153, 0.3)' }]}>
+          <Text style={[tw`text-sm font-medium`, { color: '#FF8700' }]}>友達データエラー: {friendsError}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -426,7 +542,7 @@ function NativeHomeScreen() {
   if (loading) {
     return (
       <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100`}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#FF8700" />
         <ThemedText style={tw`mt-4 text-base text-gray-600`}>マップを読み込み中...</ThemedText>
       </ThemedView>
     );

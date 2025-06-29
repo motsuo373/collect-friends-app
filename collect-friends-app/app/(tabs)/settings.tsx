@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Alert,
   ScrollView,
@@ -13,10 +12,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { router } from 'expo-router';
+import { generateAllMockData } from '../../utils/mockDataGenerator';
+import tw from 'twrnc';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [mockDataLoading, setMockDataLoading] = useState(false);
 
   const handleLogout = async () => {
     // Web版とモバイル版で確認ダイアログを分岐
@@ -68,127 +70,224 @@ export default function Settings() {
     }
   };
 
+  const handleGenerateMockData = async () => {
+    if (!user?.uid) {
+      Alert.alert('エラー', 'ユーザー情報が取得できません');
+      return;
+    }
+
+    // 確認ダイアログ
+    if (Platform.OS === 'web') {
+      const shouldGenerate = window.confirm(
+        '仮データを生成しますか？このアクションは元に戻せません。\n\n' +
+        '以下のデータが作成されます：\n' +
+        '• 5人の仮ユーザー\n' +
+        '• 各ユーザーの位置情報\n' +
+        '• あなたとの友人関係'
+      );
+      if (shouldGenerate) {
+        await performMockDataGeneration();
+      }
+    } else {
+      Alert.alert(
+        '仮データ生成',
+        '仮データを生成しますか？このアクションは元に戻せません。\n\n' +
+        '以下のデータが作成されます：\n' +
+        '• 5人の仮ユーザー\n' +
+        '• 各ユーザーの位置情報\n' +
+        '• あなたとの友人関係',
+        [
+          {
+            text: 'キャンセル',
+            style: 'cancel',
+          },
+          {
+            text: '生成する',
+            style: 'default',
+            onPress: async () => {
+              await performMockDataGeneration();
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const performMockDataGeneration = async () => {
+    setMockDataLoading(true);
+    try {
+      console.log('仮データ生成を開始します');
+      await generateAllMockData(user!.uid);
+      
+      // 成功メッセージ
+      if (Platform.OS === 'web') {
+        window.alert('仮データの生成が完了しました！\nアプリを再起動して友達タブを確認してください。');
+      } else {
+        Alert.alert(
+          '完了',
+          '仮データの生成が完了しました！\nアプリを再起動して友達タブを確認してください。'
+        );
+      }
+      
+    } catch (error) {
+      console.error('仮データ生成エラー:', error);
+      
+      // エラーメッセージ
+      if (Platform.OS === 'web') {
+        window.alert('仮データの生成に失敗しました。もう一度お試しください。');
+      } else {
+        Alert.alert('エラー', '仮データの生成に失敗しました。もう一度お試しください。');
+      }
+    } finally {
+      setMockDataLoading(false);
+    }
+  };
+
   const navigateToSetting = (path: string) => {
     router.push(`/settings/${path}` as any);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <ThemedView style={styles.content}>
+    <SafeAreaView style={tw`flex-1 bg-gray-100`}>
+      <ScrollView contentContainerStyle={tw`flex-grow`}>
+        <ThemedView style={tw`flex-1 px-4 pt-2 pb-5`}>
           {/* ヘッダー */}
-          <View style={styles.header}>
-            <ThemedText style={styles.title}>設定</ThemedText>
+          <View style={tw`mb-7`}>
+            <ThemedText style={tw`text-3xl font-bold text-gray-800`}>設定</ThemedText>
           </View>
 
           {/* ユーザー情報セクション */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>ユーザー情報</Text>
-            <View style={styles.userInfo}>
-              <View style={styles.userInfoRow}>
-                <Text style={styles.label}>ユーザー名:</Text>
-                <Text style={styles.value}>
+          <View style={tw`mb-7`}>
+            <Text style={tw`text-lg font-semibold text-gray-800 mb-4`}>ユーザー情報</Text>
+            <View style={tw`bg-white rounded-xl p-5 shadow-sm`}>
+              <View style={tw`flex-row justify-between mb-3`}>
+                <Text style={tw`text-base text-gray-600 font-medium`}>ユーザー名:</Text>
+                <Text style={tw`text-base text-gray-800 font-semibold flex-1 text-right`}>
                   {user?.displayName || 'ユーザー名未設定'}
                 </Text>
               </View>
-              <View style={styles.userInfoRow}>
-                <Text style={styles.label}>メールアドレス:</Text>
-                <Text style={styles.value}>{user?.email}</Text>
+              <View style={tw`flex-row justify-between mb-3`}>
+                <Text style={tw`text-base text-gray-600 font-medium`}>メールアドレス:</Text>
+                <Text style={tw`text-base text-gray-800 font-semibold flex-1 text-right`}>{user?.email}</Text>
               </View>
-              <View style={styles.userInfoRow}>
-                <Text style={styles.label}>ユーザーID:</Text>
-                <Text style={styles.value}>{user?.uid}</Text>
+              <View style={tw`flex-row justify-between`}>
+                <Text style={tw`text-base text-gray-600 font-medium`}>ユーザーID:</Text>
+                <Text style={tw`text-base text-gray-800 font-semibold flex-1 text-right`}>{user?.uid}</Text>
               </View>
             </View>
           </View>
 
           {/* アプリ設定セクション */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>アプリ設定</Text>
+          <View style={tw`mb-7`}>
+            <Text style={tw`text-lg font-semibold text-gray-800 mb-4`}>アプリ設定</Text>
             
             <TouchableOpacity 
-              style={styles.settingItem}
+              style={tw`bg-white rounded-xl p-4 mb-2 flex-row justify-between items-center shadow-sm`}
               onPress={() => navigateToSetting('profile')}
             >
-              <Text style={styles.settingText}>プロフィール編集</Text>
-              <Text style={styles.arrow}>›</Text>
+              <Text style={tw`text-base text-gray-800 font-medium`}>プロフィール編集</Text>
+              <Text style={tw`text-xl text-gray-300 font-light`}>›</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.settingItem}
+              style={tw`bg-white rounded-xl p-4 mb-2 flex-row justify-between items-center shadow-sm`}
               onPress={() => navigateToSetting('notifications')}
             >
-              <Text style={styles.settingText}>通知設定</Text>
-              <Text style={styles.arrow}>›</Text>
+              <Text style={tw`text-base text-gray-800 font-medium`}>通知設定</Text>
+              <Text style={tw`text-xl text-gray-300 font-light`}>›</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.settingItem}
+              style={tw`bg-white rounded-xl p-4 mb-2 flex-row justify-between items-center shadow-sm`}
               onPress={() => navigateToSetting('privacy')}
             >
-              <Text style={styles.settingText}>プライバシー設定</Text>
-              <Text style={styles.arrow}>›</Text>
+              <Text style={tw`text-base text-gray-800 font-medium`}>プライバシー設定</Text>
+              <Text style={tw`text-xl text-gray-300 font-light`}>›</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.settingItem}
+              style={tw`bg-white rounded-xl p-4 mb-2 flex-row justify-between items-center shadow-sm`}
               onPress={() => navigateToSetting('status')}
             >
-              <Text style={styles.settingText}>ステータス設定</Text>
-              <Text style={styles.arrow}>›</Text>
+              <Text style={tw`text-base text-gray-800 font-medium`}>ステータス設定</Text>
+              <Text style={tw`text-xl text-gray-300 font-light`}>›</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.settingItem}
+              style={tw`bg-white rounded-xl p-4 mb-2 flex-row justify-between items-center shadow-sm`}
               onPress={() => navigateToSetting('ai-preferences')}
             >
-              <Text style={styles.settingText}>AI学習設定</Text>
-              <Text style={styles.arrow}>›</Text>
+              <Text style={tw`text-base text-gray-800 font-medium`}>AI学習設定</Text>
+              <Text style={tw`text-xl text-gray-300 font-light`}>›</Text>
             </TouchableOpacity>
           </View>
 
-          {/* サポートセクション */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>サポート</Text>
+          {/* サポートセクション（無効化） */}
+          <View style={tw`mb-7`}>
+            <Text style={tw`text-lg font-semibold text-gray-800 mb-4`}>サポート</Text>
             
-            <TouchableOpacity style={styles.settingItem}>
-              <Text style={styles.settingText}>ヘルプ・FAQ</Text>
-              <Text style={styles.arrow}>›</Text>
+            <TouchableOpacity style={tw`bg-gray-100 rounded-xl p-4 mb-2 flex-row justify-between items-center opacity-60`} disabled>
+              <Text style={tw`text-base text-gray-500 font-medium`}>ヘルプ・FAQ</Text>
+              <Text style={tw`text-xl text-gray-400 font-light`}>›</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
-              <Text style={styles.settingText}>お問い合わせ</Text>
-              <Text style={styles.arrow}>›</Text>
+            <TouchableOpacity style={tw`bg-gray-100 rounded-xl p-4 mb-2 flex-row justify-between items-center opacity-60`} disabled>
+              <Text style={tw`text-base text-gray-500 font-medium`}>お問い合わせ</Text>
+              <Text style={tw`text-xl text-gray-400 font-light`}>›</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
-              <Text style={styles.settingText}>利用規約</Text>
-              <Text style={styles.arrow}>›</Text>
+            <TouchableOpacity style={tw`bg-gray-100 rounded-xl p-4 mb-2 flex-row justify-between items-center opacity-60`} disabled>
+              <Text style={tw`text-base text-gray-500 font-medium`}>利用規約</Text>
+              <Text style={tw`text-xl text-gray-400 font-light`}>›</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
-              <Text style={styles.settingText}>プライバシーポリシー</Text>
-              <Text style={styles.arrow}>›</Text>
+            <TouchableOpacity style={tw`bg-gray-100 rounded-xl p-4 mb-2 flex-row justify-between items-center opacity-60`} disabled>
+              <Text style={tw`text-base text-gray-500 font-medium`}>プライバシーポリシー</Text>
+              <Text style={tw`text-xl text-gray-400 font-light`}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 開発者向けセクション */}
+          <View style={tw`mb-7`}>
+            <Text style={tw`text-lg font-semibold text-gray-800 mb-4`}>開発者向け</Text>
+            
+            <TouchableOpacity
+              style={[
+                tw`bg-green-500 rounded-xl p-4 items-center shadow-sm mb-2`,
+                mockDataLoading && tw`bg-gray-300`
+              ]}
+              onPress={handleGenerateMockData}
+              disabled={mockDataLoading}
+            >
+              <Text style={tw`text-white text-lg font-semibold mb-1`}>
+                {mockDataLoading ? '仮データ生成中...' : '🧑‍🤝‍🧑 仮の友達を作る'}
+              </Text>
+              <Text style={tw`text-white text-sm opacity-90`}>
+                テスト用の友達データを生成します
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* ログアウトボタン */}
-          <View style={styles.section}>
+          <View style={tw`mb-7`}>
             <TouchableOpacity
-              style={[styles.logoutButton, loading && styles.buttonDisabled]}
+              style={[
+                tw`bg-red-500 rounded-xl p-4 items-center shadow-sm`,
+                loading && tw`bg-gray-300`
+              ]}
               onPress={handleLogout}
               disabled={loading}
             >
-              <Text style={styles.logoutButtonText}>
+              <Text style={tw`text-white text-lg font-semibold`}>
                 {loading ? 'ログアウト中...' : 'ログアウト'}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* アプリ情報 */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Collect Friends App</Text>
-            <Text style={styles.footerText}>Version 1.0.2</Text>
+          <View style={tw`items-center mt-7`}>
+            <Text style={tw`text-sm text-gray-500 mb-1`}>Collect Friends App</Text>
+            <Text style={tw`text-sm text-gray-500`}>Version 1.0.2</Text>
           </View>
         </ThemedView>
       </ScrollView>
@@ -196,123 +295,3 @@ export default function Settings() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 20,
-  },
-  header: {
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
-  },
-  userInfo: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  userInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  label: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  value: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  settingItem: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 18,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  settingText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  arrow: {
-    fontSize: 20,
-    color: '#ccc',
-    fontWeight: '300',
-  },
-  logoutButton: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  logoutButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 30,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 5,
-  },
-}); 

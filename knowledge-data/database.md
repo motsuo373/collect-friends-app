@@ -36,6 +36,51 @@
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 更新日時 |
 
+#### friendsList (サブコレクション)
+```
+ドキュメントID: {friendUid}
+```
+
+| フィールド | 型 | 説明 |
+|-----------|---|------|
+| friendUid | string | 友人のUID |
+| displayName | string | 友人の表示名 |
+| profileImage | string | 友人のプロフィール画像URL |
+| relationshipRef | reference | relationships コレクションへの参照 |
+| sharingLevel | number | この友人への位置情報共有レベル (1-4) |
+| currentStatus | string | 友人の現在ステータス ('free', 'busy', 'offline') |
+| mood | array | 友人のやりたいこと (['drinking', 'cafe']など) |
+| availableUntil | timestamp | 友人が暇でいられる時間 |
+| customMessage | string | 友人のカスタムステータスメッセージ |
+| isOnline | boolean | 友人のオンライン状況 |
+| lastActive | timestamp | 友人の最終アクティブ時間 |
+| sharedLocation | object | 共有レベルに応じた位置情報 |
+| locationLastUpdate | timestamp | 位置情報の最終更新時間 |
+| isFavorite | boolean | お気に入り友人フラグ |
+| interactionCount | number | 過去の交流回数 |
+| lastInteraction | timestamp | 最後の交流日時 |
+| createdAt | timestamp | 友人関係の開始日時 |
+| updatedAt | timestamp | 情報の最終更新日時 |
+
+**sharedLocation オブジェクトの構造**
+```json
+{
+  "level": 1-4,  // 共有レベル
+  "coordinates": {  // レベル1,2の場合のみ
+    "lat": number,
+    "lng": number
+  },
+  "maskedCoordinates": {  // レベル2の場合（大雑把な位置）
+    "lat": number,  // 精度を落とした座標
+    "lng": number,
+    "accuracy": "area"  // エリア表示であることを示す
+  },
+  "statusOnly": boolean,  // レベル3の場合（位置非表示、ステータスのみ）
+  "areaDescription": string,  // "家にいる", "外出中", "職場" など
+  "distanceRange": string  // "近く", "少し離れた場所", "遠く" など（レベル2の場合）
+}
+```
+
 ### relationships
 ```
 ドキュメントID: {relationshipId}
