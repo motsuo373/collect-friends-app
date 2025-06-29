@@ -62,7 +62,20 @@
 | createdAt | timestamp | 友人関係の開始日時 |
 | updatedAt | timestamp | 情報の最終更新日時 |
 
-#### proposal（usersのサブコレクション）
+#### userProposal（usersのサブコレクション）
+```
+ドキュメントID: {proposalId}
+```
+
+| フィールド | 型 | 説明 |
+|-----------|---|------|
+| proposalId | string | 提案ID（proposals コレクションと同じID） |
+| proposalRef | reference | proposals コレクションへの参照 |
+| status | string | このユーザーの応答状況 ('pending', 'accepted', 'declined', 'maybe') |
+| respondedAt | timestamp | 応答日時（任意） |
+| notificationSent | boolean | 通知送信済みかどうか |
+| receivedAt | timestamp | 提案を受信した日時 |
+| updatedAt | timestamp | 最終更新日時 |
 
 **sharedLocation オブジェクトの構造**
 ```json
@@ -211,14 +224,110 @@
 | フィールド | 型 | 説明 |
 |-----------|---|------|
 | proposalId | string | 提案ID |
-| type | string | 提案種類 ('group_meetup', 'venue_recommendation') |
-| targetUsers | array | 対象ユーザーリスト |
-| proposal | object | 提案内容（タイトル、説明、場所、時間） |
-| aiAnalysis | object | AI分析データ（信頼度、推薦理由） |
-| responses | array | ユーザー応答リスト |
-| status | string | 提案状態 ('active', 'processing', 'processed', 'expired') |
-| expiresAt | timestamp | 有効期限 |
+| title | string | 提案タイトル（例：「渋谷で飲み会」） |
+| description | string | 提案の詳細説明 |
+| type | string | 提案種類 ('group_meetup', 'venue_recommendation', 'activity_suggestion') |
+| proposalSource | string | 提案元 ('user', 'ai', 'friend_invite') |
+| creatorRef | reference | 提案作成者への参照（ユーザー提案の場合） |
+| creatorDisplayName | string | 提案作成者の表示名 |
+| targetUsers | array | 対象ユーザーリスト（UID配列） |
+| invitedUsers | array | 招待されたユーザーの詳細情報配列 |
+| scheduledAt | timestamp | 予定日時 |
+| endTime | timestamp | 終了予定時間（任意） |
+| location | object | 場所情報 |
+| category | string | カテゴリー ('drinking', 'cafe', 'restaurant', 'activity', 'other') |
+| budget | object | 予算情報（最小・最大金額） |
+| capacity | object | 参加人数（最小・最大人数） |
+| requirements | array | 参加条件・要件 |
+| tags | array | タグリスト（検索・フィルタリング用） |
+| aiAnalysis | object | AI分析データ（信頼度、推薦理由、マッチングスコア） |
+| responses | object | ユーザー応答状況 {[uid]: {status: string, respondedAt: timestamp}} |
+| responseCount | object | 応答集計 {accepted: number, declined: number, pending: number} |
+| status | string | 提案状態 ('active', 'confirmed', 'cancelled', 'expired', 'completed') |
+| priority | string | 優先度 ('low', 'normal', 'high', 'urgent') |
+| isPublic | boolean | 公開提案かどうか |
+| allowInvites | boolean | 参加者が他の人を招待できるか |
+| autoConfirm | boolean | 一定条件で自動確定するか |
+| confirmationDeadline | timestamp | 確定期限 |
+| expiresAt | timestamp | 提案の有効期限 |
+| relatedEventRef | reference | 関連イベントへの参照（確定後） |
+| relatedChatRef | reference | 関連チャットへの参照 |
 | createdAt | timestamp | 作成日時 |
+| updatedAt | timestamp | 最終更新日時 |
+
+**location オブジェクトの構造**
+```json
+{
+  "name": "焼肉居酒屋Kanjie 渋谷店",
+  "address": "東京都渋谷区...",
+  "coordinates": {
+    "lat": 35.6580,
+    "lng": 139.7016
+  },
+  "placeId": "ChIJ...",  // Google Places ID
+  "category": "restaurant",
+  "phone": "03-1234-5678",
+  "website": "https://...",
+  "priceLevel": 2,  // 1-4の価格レベル
+  "rating": 4.2,
+  "photos": ["url1", "url2"]
+}
+```
+
+**invitedUsers 配列の要素構造**
+```json
+{
+  "uid": "user123",
+  "displayName": "Aさん",
+  "profileImage": "https://...",
+  "role": "participant",  // "creator", "participant", "maybe"
+  "invitedAt": "timestamp",
+  "invitedBy": "uid_of_inviter"
+}
+```
+
+**budget オブジェクトの構造**
+```json
+{
+  "min": 3000,
+  "max": 5000,
+  "currency": "JPY",
+  "perPerson": true,
+  "includesFood": true,
+  "includesDrinks": true,
+  "notes": "飲み放題込み"
+}
+```
+
+**capacity オブジェクトの構造**
+```json
+{
+  "min": 3,
+  "max": 8,
+  "current": 5,
+  "waitingList": 2
+}
+```
+
+**aiAnalysis オブジェクトの構造**
+```json
+{
+  "confidence": 0.85,
+  "matchingScore": 0.92,
+  "reasons": ["共通の興味", "近い場所", "予算が合致"],
+  "recommendationBasis": ["過去の参加履歴", "友人の好み", "位置情報"],
+  "successProbability": 0.78,
+  "alternativeVenues": ["venue1", "venue2"],
+  "suggestedTime": "2024-06-29T18:00:00Z",
+  "factorsConsidered": {
+    "userPreferences": true,  
+    "locationData": true,
+    "pastEvents": true,
+    "friendsAvailability": true
+  }
+}
+```
+
 
 ### notifications
 ```
@@ -256,4 +365,51 @@
 
 - **精度レベル**: 6文字（約1.2km四方）を基本とし、用途に応じて調整
 - **近隣検索**: Geohashの前方一致検索で効率的な位置ベースクエリを実現
-- **プライバシー**: 共有レベルに応じてGeohashの精度を調整 
+- **プライバシー**: 共有レベルに応じてGeohashの精度を調整
+
+---
+
+## 提案システム設計
+
+### 提案の種類
+
+| 提案元 | 説明 | UI表示 |
+|--------|------|--------|
+| user | ユーザーが作成した提案 | 「あなたが提案」 |
+| ai | AIが生成した提案 | 「AIが提案」 |
+| friend_invite | 友人からの招待 | 「○○さんからの招待」 |
+
+### 提案のライフサイクル
+
+1. **作成** (`active`) - 提案が作成され、対象ユーザーに配信
+2. **応答待ち** (`active`) - ユーザーの応答を待機中
+3. **確定** (`confirmed`) - 十分な参加者が集まり、イベントとして確定
+4. **完了** (`completed`) - イベントが実施完了
+5. **期限切れ** (`expired`) - 確定期限を過ぎて自動終了
+6. **キャンセル** (`cancelled`) - 手動でキャンセル
+
+### ユーザー応答状況
+
+| ステータス | 説明 |
+|-----------|------|
+| pending | 未回答（デフォルト） |
+| accepted | 参加したい |
+| declined | 参加しない |
+| maybe | 検討中・未定 |
+
+### 提案配信ロジック
+
+1. **対象ユーザー選定**: 位置情報、興味、過去の履歴に基づく
+2. **個別配信**: 各ユーザーの`userProposal`サブコレクションに配信
+3. **通知送信**: プッシュ通知やアプリ内通知で告知
+4. **応答収集**: ユーザーの応답を`proposals`と`userProposal`両方に記録
+5. **自動確定**: 条件を満たした場合に`events`コレクションにイベント作成
+
+### フィルタリング・検索
+
+- **カテゴリー**: 飲み会、カフェ、アクティビティなど
+- **時間帯**: 朝、昼、夜
+- **予算範囲**: 価格帯による絞り込み
+- **距離**: 現在位置からの距離
+- **提案元**: ユーザー/AI/友人招待
+- **参加人数**: 希望する参加人数範囲 
