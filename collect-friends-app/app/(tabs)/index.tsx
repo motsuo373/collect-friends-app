@@ -8,7 +8,7 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icons } from '@/utils/iconHelper';
 import { StatusModal, UserStatus } from '@/components/StatusModal';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -434,7 +434,7 @@ function WebHomeScreen() {
   if (!locationPermissionGranted) {
     return (
       <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100 px-10`}>
-        <Ionicons name="location-outline" size={64} color="#ccc" />
+        <Icons.MapPin size={64} color="#ccc" />
         <ThemedText type="title" style={tw`mt-5 mb-3 text-center`}>
           位置情報が必要です
         </ThemedText>
@@ -483,7 +483,7 @@ function WebHomeScreen() {
             style={tw`p-1`}
             onPress={() => setStatusModalVisible(true)}
           >
-            <Ionicons name="create-outline" size={20} color="#FF8700" />
+            <Icons.Edit size={20} color="#FF8700" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -495,7 +495,7 @@ function WebHomeScreen() {
             style={tw`w-14 h-14 rounded-full justify-center items-center shadow-lg bg-white mb-3`}
             onPress={handleMyLocationPress}
           >
-            <Ionicons name="locate" size={24} color="#FF8700" />
+            <Icons.Crosshair size={24} color="#FF8700" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -542,7 +542,7 @@ function NativeHomeScreen() {
   if (loading) {
     return (
       <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100`}>
-        <ActivityIndicator size="large" color="#FF8700" />
+        <ActivityIndicator size="large" color="#007AFF" />
         <ThemedText style={tw`mt-4 text-base text-gray-600`}>マップを読み込み中...</ThemedText>
       </ThemedView>
     );
@@ -551,7 +551,7 @@ function NativeHomeScreen() {
   if (!NativeMapComponent) {
     return (
       <ThemedView style={tw`flex-1 justify-center items-center bg-gray-100 px-10`}>
-        <Ionicons name="warning-outline" size={64} color="#FF9800" />
+        <Icons.AlertTriangle size={64} color="#FF9800" />
         <ThemedText type="title" style={tw`mt-5 mb-3 text-center`}>
           マップの読み込みに失敗しました
         </ThemedText>

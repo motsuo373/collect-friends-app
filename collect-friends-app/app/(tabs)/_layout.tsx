@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { MapPin, Users, Sparkles, MessageCircle, Settings } from 'lucide-react-native';
+import { Icons } from '@/utils/iconHelper';
 import { HapticTab } from '@/components/HapticTab';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
@@ -46,7 +46,7 @@ export default function TabLayout() {
         options={{
           title: 'マップ',
           tabBarIcon: ({ color, size }) => (
-            <MapPin 
+            <Icons.MapPin 
               size={Platform.select({ ios: 24, default: 22 })} 
               color={color} 
               strokeWidth={2}
@@ -59,7 +59,7 @@ export default function TabLayout() {
         options={{
           title: 'フレンド',
           tabBarIcon: ({ color, size }) => (
-            <Users 
+            <Icons.Users 
               size={Platform.select({ ios: 24, default: 22 })} 
               color={color} 
               strokeWidth={2}
@@ -72,7 +72,7 @@ export default function TabLayout() {
         options={{
           title: 'AI提案',
           tabBarIcon: ({ color, size }) => (
-            <Sparkles 
+            <Icons.Sparkles 
               size={Platform.select({ ios: 24, default: 22 })} 
               color={color} 
               strokeWidth={2}
@@ -85,7 +85,7 @@ export default function TabLayout() {
         options={{
           title: 'チャット',
           tabBarIcon: ({ color, size }) => (
-            <MessageCircle 
+            <Icons.MessageCircle 
               size={Platform.select({ ios: 24, default: 22 })} 
               color={color} 
               strokeWidth={2}
@@ -98,7 +98,7 @@ export default function TabLayout() {
         options={{
           title: '設定',
           tabBarIcon: ({ color, size }) => (
-            <Settings 
+            <Icons.Settings 
               size={Platform.select({ ios: 24, default: 22 })} 
               color={color} 
               strokeWidth={2}

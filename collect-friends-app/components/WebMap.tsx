@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { renderToString } from 'react-dom/server';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Users } from 'lucide-react-native';
+import { Icons } from '@/utils/iconHelper';
 
 // Leafletのデフォルトアイコンの修正（React環境での問題解決）
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -164,24 +165,31 @@ const WebMap = forwardRef<WebMapRef, WebMapProps>(({
     };
   }, []);
 
+
   const defaultCenter: [number, number] = userLocation 
     ? [userLocation.latitude, userLocation.longitude]
     : [35.6762, 139.6503]; // 東京駅
 
-  // Lucideアイコンを使用したカスタムマーカーアイコンの作成
+  // iconHelperから適切なアイコンを使用したカスタムマーカーアイコンの作成
   const createCustomIcon = (isUser = false, isAvailable = true) => {
     const className = isUser ? 'user-marker' : 'friend-marker';
     const size = isUser ? 44 : 36;
+    const iconSize = isUser ? 24 : 16;
     
     // ユーザーのマーカーはメインオレンジ、友達は薄いオレンジ
     const iconColor = isUser 
       ? '#FF8700' 
       : isAvailable ? '#FFB366' : '#FFCC99'; // 暇な友達は少し濃い薄オレンジ、忙しい友達はもっと薄いオレンジ
     
-    // SVGアイコンを作成
-    const iconSvg = isUser 
-      ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`
-      : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m22 21-3-3m0 0a5.5 5.5 0 0 0-7.54-.54 4.91 4.91 0 0 0-1.11 1.11A5.5 5.5 0 0 0 19 18Z"/></svg>`;
+    // iconHelperから適切なアイコンコンポーネントを選択
+    const IconComponent = isUser ? Icons.MapPin : Icons.User;
+    
+    // アイコンコンポーネントをHTML文字列に変換
+    const iconSvg = renderToString(React.createElement(IconComponent, {
+      size: iconSize,
+      color: iconColor,
+      strokeWidth: 2
+    }));
     
     return L.divIcon({
       className: 'custom-div-icon',

@@ -4,19 +4,9 @@ import { Platform } from 'react-native';
 import { SymbolViewProps } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type ViewStyle } from 'react-native';
+import { Icons } from '@/utils/iconHelper';
 
-// Lucide React Native icons
-import { 
-  Home, 
-  Send, 
-  Code, 
-  ChevronRight, 
-  MapPin,
-  MessageSquare,
-  Settings 
-} from 'lucide-react-native';
-
-type LucideIconComponent = typeof Home;
+type LucideIconComponent = any;
 type LucideIconMapping = Record<SymbolViewProps['name'], LucideIconComponent>;
 type IconSymbolName = keyof typeof LUCIDE_MAPPING;
 
@@ -26,13 +16,13 @@ type IconSymbolName = keyof typeof LUCIDE_MAPPING;
  * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
  */
 const LUCIDE_MAPPING = {
-  'house.fill': Home,
-  'paperplane.fill': Send,
-  'chevron.left.forwardslash.chevron.right': Code,
-  'chevron.right': ChevronRight,
-  'map.fill': MapPin,
-  'message.fill': MessageSquare,
-  'gear': Settings,
+  'house.fill': Icons.Home,
+  'paperplane.fill': Icons.Send,
+  'chevron.left.forwardslash.chevron.right': Icons.Code,
+  'chevron.right': Icons.ChevronRight,
+  'map.fill': Icons.MapPin,
+  'message.fill': Icons.MessageSquare,
+  'gear': Icons.Settings,
 } as LucideIconMapping;
 
 /**

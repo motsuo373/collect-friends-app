@@ -7,7 +7,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icons } from '@/utils/iconHelper';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import tw from 'twrnc';
@@ -35,12 +35,12 @@ const availabilityOptions = [
 ];
 
 const activityOptions = [
-  { key: 'cafe', label: 'お茶・カフェ', iconName: 'location-outline' as keyof typeof Ionicons.glyphMap },
-  { key: 'drink', label: '軽く飲み', iconName: 'happy-outline' as keyof typeof Ionicons.glyphMap },
-  { key: 'walk', label: '散歩・ぶらぶら', iconName: 'compass-outline' as keyof typeof Ionicons.glyphMap },
-  { key: 'shopping', label: 'ショッピング', iconName: 'storefront-outline' as keyof typeof Ionicons.glyphMap },
-  { key: 'movie', label: '映画', iconName: 'play-outline' as keyof typeof Ionicons.glyphMap },
-  { key: 'lunch', label: '軽食・ランチ', iconName: 'fast-food-outline' as keyof typeof Ionicons.glyphMap },
+  { key: 'cafe', label: 'お茶・カフェ', IconComponent: Icons.Coffee },
+  { key: 'drink', label: '軽く飲み', IconComponent: Icons.Wine },
+  { key: 'walk', label: '散歩・ぶらぶら', IconComponent: Icons.Compass },
+  { key: 'shopping', label: 'ショッピング', IconComponent: Icons.ShoppingBag },
+  { key: 'movie', label: '映画', IconComponent: Icons.Play },
+  { key: 'lunch', label: '軽食・ランチ', IconComponent: Icons.Utensils },
 ];
 
 export const StatusModal: React.FC<StatusModalProps> = ({
@@ -88,7 +88,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({
         <View style={tw`flex-row justify-between items-center p-5 pt-15 border-b border-gray-200`}>
           <ThemedText type="title">ステータス設定</ThemedText>
           <TouchableOpacity onPress={onClose} style={tw`w-8 h-8 justify-center items-center bg-gray-100 rounded-full`}>
-            <Ionicons name="close" size={20} color="#666" />
+            <Icons.X size={20} color="#666" />
           </TouchableOpacity>
         </View>
 
@@ -170,32 +170,34 @@ export const StatusModal: React.FC<StatusModalProps> = ({
               <View style={tw`mb-8`}>
                 <ThemedText type="subtitle">やりたいこと</ThemedText>
                 <View style={tw`flex-row flex-wrap mt-3 -m-1.5`}>
-                  {activityOptions.map((activity) => (
-                    <TouchableOpacity
-                      key={activity.key}
-                      style={[
-                        tw`w-[30%] bg-gray-100 rounded-2xl justify-center items-center p-2 m-1.5`,
-                        { height: 60 },
-                        selectedActivities.includes(activity.key) && [
-                          tw`border-2 border-orange-500`,
-                          { backgroundColor: '#FFF' }
-                        ],
-                      ]}
-                      onPress={() => toggleActivity(activity.key)}
-                    >
-                      <Ionicons 
-                        name={activity.iconName} 
-                        size={18} 
-                        color={selectedActivities.includes(activity.key) ? '#FF8700' : '#666'} 
-                      />
-                      <Text style={[
-                        tw`text-xs text-center mt-1 font-medium`,
-                        selectedActivities.includes(activity.key) ? tw`text-orange-500 font-bold` : tw`text-gray-600`,
-                      ]}>
-                        {activity.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {activityOptions.map((activity) => {
+                    const IconComponent = activity.IconComponent;
+                    return (
+                      <TouchableOpacity
+                        key={activity.key}
+                        style={[
+                          tw`w-[30%] bg-gray-100 rounded-2xl justify-center items-center p-2 m-1.5`,
+                          { height: 60 },
+                          selectedActivities.includes(activity.key) && [
+                            tw`border-2 border-orange-500`,
+                            { backgroundColor: '#FFF' }
+                          ],
+                        ]}
+                        onPress={() => toggleActivity(activity.key)}
+                      >
+                        <IconComponent 
+                          size={18} 
+                          color={selectedActivities.includes(activity.key) ? '#FF8700' : '#666'} 
+                        />
+                        <Text style={[
+                          tw`text-xs text-center mt-1 font-medium`,
+                          selectedActivities.includes(activity.key) ? tw`text-orange-500 font-bold` : tw`text-gray-600`,
+                        ]}>
+                          {activity.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             </>

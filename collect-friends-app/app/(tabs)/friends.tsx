@@ -9,7 +9,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { Filter, X, Coffee, Wine, Compass, ShoppingBag, Play, Utensils, Check, CircleCheckBig, RefreshCw } from 'lucide-react-native';
+import { Icons } from '@/utils/iconHelper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -24,12 +24,12 @@ interface FilterState {
 }
 
 const activityOptions = [
-  { key: 'cafe', label: 'お茶・カフェ', IconComponent: Coffee },
-  { key: 'drink', label: '軽く飲み', IconComponent: Wine },
-  { key: 'walk', label: '散歩・ぶらぶら', IconComponent: Compass },
-  { key: 'shopping', label: 'ショッピング', IconComponent: ShoppingBag },
-  { key: 'movie', label: '映画', IconComponent: Play },
-  { key: 'lunch', label: '軽食・ランチ', IconComponent: Utensils },
+  { key: 'cafe', label: 'お茶・カフェ', IconComponent: Icons.Coffee },
+  { key: 'drink', label: '軽く飲み', IconComponent: Icons.Wine },
+  { key: 'walk', label: '散歩・ぶらぶら', IconComponent: Icons.Compass },
+  { key: 'shopping', label: 'ショッピング', IconComponent: Icons.ShoppingBag },
+  { key: 'movie', label: '映画', IconComponent: Icons.Play },
+  { key: 'lunch', label: '軽食・ランチ', IconComponent: Icons.Utensils },
 ];
 
 // availabilityStatusをcurrentStatusとisOnlineから導出する関数
@@ -129,9 +129,6 @@ export default function FriendsScreen() {
 
   const handleInvite = () => {
     if (selectedFriends.length > 0) {
-      // TODO: 招待機能の実装
-      console.log('招待する友達:', selectedFriends);
-      
       // 成功モーダルを表示
       setIsInviteSuccessModalVisible(true);
       
@@ -166,7 +163,7 @@ export default function FriendsScreen() {
           style={tw`bg-[#FF7300] px-6 py-3 rounded-xl flex-row items-center`}
           onPress={refetch}
         >
-          <RefreshCw size={20} color="white" style={tw`mr-2`} />
+          <Icons.RefreshCw size={20} color="white" style={tw`mr-2`} />
           <Text style={tw`text-white font-semibold`}>再試行</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -187,7 +184,7 @@ export default function FriendsScreen() {
           style={tw`bg-[#FF7300] px-6 py-3 rounded-xl flex-row items-center`}
           onPress={refetch}
         >
-          <RefreshCw size={20} color="white" style={tw`mr-2`} />
+          <Icons.RefreshCw size={20} color="white" style={tw`mr-2`} />
           <Text style={tw`text-white font-semibold`}>更新</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -222,7 +219,7 @@ export default function FriendsScreen() {
             style={tw`p-2`}
             onPress={() => setIsFilterModalVisible(true)}
           >
-            <Filter 
+            <Icons.Filter 
               size={24} 
               color={hasActiveFilters() ? "#FF7300" : "#666"} 
               fill={hasActiveFilters() ? "#FF7300" : "none"}
@@ -318,7 +315,7 @@ export default function FriendsScreen() {
                 {/* 選択時のチェックマーク */}
                 {selectedFriends.includes(friend.id) && (
                   <View style={tw`ml-3 w-6 h-6 items-center justify-center`}>
-                    <Check size={20} color="#FF7300" />
+                    <Icons.Check size={20} color="#FF7300" />
                   </View>
                 )}
               </View>
@@ -411,7 +408,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, filters, on
         <View style={tw`flex-row justify-between items-center p-5 pt-15 border-b border-gray-200`}>
           <ThemedText type="title">ステータスで絞り込み</ThemedText>
           <TouchableOpacity onPress={onClose} style={tw`w-8 h-8 justify-center items-center bg-gray-100 rounded-full`}>
-            <X size={20} color="#666" />
+            <Icons.X size={20} color="#666" />
           </TouchableOpacity>
         </View>
 
@@ -514,7 +511,7 @@ const InviteSuccessModal: React.FC<InviteSuccessModalProps> = ({ visible, onClos
       <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-8`}>
         <View style={tw`bg-white rounded-2xl p-8 items-center max-w-80 w-full`}>
           <View style={tw`w-16 h-16 bg-green-100 rounded-full items-center justify-center mb-4`}>
-            <CircleCheckBig size={32} color="#22C55E" />
+            <Icons.CircleCheck size={32} color="#22C55E" />
           </View>
           
           <Text style={tw`text-xl font-bold text-gray-800 mb-2 text-center`}>
