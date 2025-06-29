@@ -36,7 +36,7 @@
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 更新日時 |
 
-#### friendsList (サブコレクション)
+#### friendsList (usersのサブコレクション)
 ```
 ドキュメントID: {friendUid}
 ```
@@ -61,6 +61,8 @@
 | lastInteraction | timestamp | 最後の交流日時 |
 | createdAt | timestamp | 友人関係の開始日時 |
 | updatedAt | timestamp | 情報の最終更新日時 |
+
+#### proposal（usersのサブコレクション）
 
 **sharedLocation オブジェクトの構造**
 ```json
@@ -201,7 +203,7 @@
 | verified | boolean | 認証済み店舗かどうか |
 | createdAt | timestamp | 作成日時 |
 
-### ai_proposals
+### proposals
 ```
 ドキュメントID: {proposalId}
 ```
@@ -215,7 +217,6 @@
 | aiAnalysis | object | AI分析データ（信頼度、推薦理由） |
 | responses | array | ユーザー応答リスト |
 | status | string | 提案状態 ('active', 'processing', 'processed', 'expired') |
-| progress | number | 処理進捗率（0-100） |
 | expiresAt | timestamp | 有効期限 |
 | createdAt | timestamp | 作成日時 |
 

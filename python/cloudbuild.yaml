@@ -1,0 +1,45 @@
+steps:
+  # Docker イメージをビルド
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/activity-recommendation-api:$COMMIT_SHA', '.']
+    dir: 'python'
+
+  # Docker イメージをContainer Registryにプッシュ
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/activity-recommendation-api:$COMMIT_SHA']
+
+  # Cloud Run にデプロイ
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'activity-recommendation-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/activity-recommendation-api:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--concurrency'
+      - '80'
+      - '--timeout'
+      - '300'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID,REDIS_URL=${_REDIS_URL},GOOGLE_PLACES_API_KEY=${_GOOGLE_PLACES_API_KEY},GEMINI_API_KEY=${_GEMINI_API_KEY}'
+
+substitutions:
+  _REGION: 'asia-northeast1'
+  _REDIS_URL: 'redis://your-redis-host:6379'
+  _GOOGLE_PLACES_API_KEY: ''
+  _GEMINI_API_KEY: ''
+
+options:
+  logging: CLOUD_LOGGING_ONLY 
