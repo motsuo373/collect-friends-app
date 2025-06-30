@@ -19,24 +19,29 @@ class CacheService:
     
     async def connect(self):
         """Redis接続を初期化（失敗してもアプリケーション起動を停止しない）"""
-        for attempt in range(self.max_retries):
+        # Cloud Run環境では非常に短いタイムアウトで高速にフェールする
+        max_retries = 2
+        connect_timeout = 2
+        operation_timeout = 1
+        
+        for attempt in range(max_retries):
             try:
-                print(f"Attempting Redis connection (attempt {attempt + 1}/{self.max_retries})...")
+                print(f"Attempting Redis connection (attempt {attempt + 1}/{max_retries})...")
                 
-                # 短いタイムアウトでRedis接続を試行
+                # 非常に短いタイムアウトでRedis接続を試行
                 self.redis = redis.from_url(
                     self.settings.REDIS_URL,
                     encoding="utf-8",
                     decode_responses=True,
-                    socket_connect_timeout=5,  # 接続タイムアウト5秒
-                    socket_timeout=3,          # 操作タイムアウト3秒
-                    retry_on_timeout=True,
-                    retry_on_error=[redis.ConnectionError, redis.TimeoutError],
-                    max_connections=10
+                    socket_connect_timeout=connect_timeout,  # 接続タイムアウト2秒
+                    socket_timeout=operation_timeout,        # 操作タイムアウト1秒
+                    retry_on_timeout=False,  # タイムアウト時のリトライを無効化
+                    retry_on_error=[],       # エラー時のリトライを無効化
+                    max_connections=5
                 )
                 
-                # 接続テスト（短いタイムアウトで）
-                await asyncio.wait_for(self.redis.ping(), timeout=3)
+                # 接続テスト（非常に短いタイムアウトで）
+                await asyncio.wait_for(self.redis.ping(), timeout=operation_timeout)
                 print(f"✅ Redis connection established successfully!")
                 self.connection_retries = 0
                 return
@@ -51,11 +56,11 @@ class CacheService:
             # 失敗した場合はRedisをNoneに設定
             self.redis = None
             
-            # 最後の試行でない場合は少し待つ
-            if attempt < self.max_retries - 1:
-                await asyncio.sleep(1)
+            # 最後の試行でない場合は非常に短い待機
+            if attempt < max_retries - 1:
+                await asyncio.sleep(0.1)  # 100ms待機
         
-        print(f"⚠️  Redis connection failed after {self.max_retries} attempts. Continuing without cache.")
+        print(f"⚠️  Redis connection failed after {max_retries} attempts. Continuing without cache.")
         self.redis = None
     
     async def disconnect(self):

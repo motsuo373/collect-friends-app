@@ -17,13 +17,15 @@ async def lifespan(app: FastAPI):
     """アプリケーションのライフサイクル管理"""
     # 起動時
     print("Starting up...")
-    await cache_service.connect()
+    # Redis接続を一時的に無効化してテスト
+    # await cache_service.connect()
+    print("Redis connection temporarily disabled for debugging")
     
     yield
     
     # 終了時
     print("Shutting down...")
-    await cache_service.disconnect()
+    # await cache_service.disconnect()
 
 
 # FastAPIアプリケーションの作成
@@ -67,12 +69,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     """ヘルスチェック"""
-    redis_health = await cache_service.health_check()
+    # Redis依存を一時的に無効化してテスト
+    # redis_health = await cache_service.health_check()
     
     return {
         "status": "healthy",
         "version": "1.0.0",
-        "redis": redis_health,
+        "redis": {"status": "disabled_for_debug"},
         "message": "Application is running"
     }
 
