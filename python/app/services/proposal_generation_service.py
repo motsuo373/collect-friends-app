@@ -377,7 +377,7 @@ class ProposalGenerationService:
     def _build_user_proposals(
         self, proposal: Proposal, all_users: List[Dict[str, Any]]
     ) -> List[Tuple[str, UserProposal]]:
-        """ユーザー個別提案を構築"""
+        """ユーザー個別提案を構築（提案内容の複製を含む）"""
         user_proposals = []
         
         for user in all_users:
@@ -388,7 +388,24 @@ class ProposalGenerationService:
             user_proposal = UserProposal(
                 proposal_id=proposal.proposal_id,
                 proposal_ref=f"proposals/{proposal.proposal_id}",
-                priority=random.uniform(0.6, 0.9)  # AI算出優先度
+                priority=random.uniform(0.6, 0.9),  # AI算出優先度
+                
+                # 提案内容の複製（フロントエンド取得用）
+                title=proposal.title,
+                description=proposal.description,
+                type=proposal.type,
+                proposal_source=proposal.proposal_source,
+                creator_display_name=proposal.creator_display_name,
+                target_users=proposal.target_users,
+                scheduled_at=proposal.scheduled_at,
+                end_time=proposal.end_time,
+                location=proposal.location,
+                category=proposal.category,
+                budget=proposal.budget,
+                capacity=proposal.capacity,
+                response_count=proposal.response_count,
+                expires_at=proposal.expires_at,
+                created_at=proposal.created_at or datetime.now()
             )
             
             user_proposals.append((user_uid, user_proposal))

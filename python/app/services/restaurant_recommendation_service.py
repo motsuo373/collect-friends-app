@@ -898,6 +898,15 @@ class RestaurantRecommendationService:
 
         time_context = f"（{time_of_day}）" if time_of_day else ""
 
+        # アクティビティに応じた具体的なアドバイス
+        activity_advice = ""
+        if "drink" in activity_types:
+            activity_advice += "\n**飲みに関する重要なポイント**:\n"
+            activity_advice += "- 居酒屋、飲み屋、バー、立ち飲み、ビアガーデンなどの店舗を優先\n"
+            activity_advice += "- 「レストラン」でも居酒屋風の雰囲気があれば積極的に選択\n"
+            activity_advice += "- 飲み放題やハッピーアワーがある店舗を優遇\n"
+            activity_advice += "- 友人同士で気軽に乾杯できる雰囲気を重視\n"
+
         return f"""あなたは友人同士で気軽に遊びに行ける店舗を推奨するエキスパートです。
 
 ## 今回のシーン
@@ -914,6 +923,7 @@ class RestaurantRecommendationService:
 3. **雰囲気**: 友人同士で楽しめる、堅苦しくない
 4. **チェーン店優遇**: {'安心感があり利用しやすい' if prefer_chain_stores else '個性的な店も考慮'}
 5. **アクセス**: 駅から近い、行きやすい
+{activity_advice}
 
 ## 店舗候補
 {restaurant_info}
@@ -938,7 +948,9 @@ class RestaurantRecommendationService:
 **注意**: 
 - 推奨スコアは10点満点です
 - 高級店や要予約店は避けてください
-- 友人同士で気軽に楽しめることを最優先にしてください"""
+- 友人同士で気軽に楽しめることを最優先にしてください
+- 日本では多くの居酒屋が「レストラン」カテゴリに分類されています
+- 店舗名に「居酒屋」「飲み屋」「酒場」などが含まれていない場合でも、気軽に飲める店舗なら積極的に選択してください"""
 
     def _parse_casual_selection_response(
         self, response: str, restaurants: List[RestaurantInfo]

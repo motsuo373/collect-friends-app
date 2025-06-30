@@ -103,3 +103,5 @@ collect-friends-app/node_modules/
 collect-friends-app/.expo/
 collect-friends-app/dist/
 collect-friends-app/web-build/ 
+
+python/deploy.sh

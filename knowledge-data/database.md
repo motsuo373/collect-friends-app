@@ -62,6 +62,57 @@
 | createdAt | timestamp | 友人関係の開始日時 |
 | updatedAt | timestamp | 情報の最終更新日時 |
 
+#### chatsList (usersのサブコレクション)
+```
+ドキュメントID: {chatId}
+```
+
+| フィールド | 型 | 説明 |
+|-----------|---|------|
+| chatId | string | チャットID（chats コレクションと同じID） |
+| chatRef | reference | chats コレクションへの参照 |
+| chatType | string | チャット種類 ('group', 'ai_proposal', 'direct') |
+| title | string | チャットタイトル（例：「渋谷で飲み会」） |
+| lastMessage | object | 最後のメッセージ情報 |
+| lastMessageTime | timestamp | 最後のメッセージ時間 |
+| unreadCount | number | 未読メッセージ数 |
+| isActive | boolean | チャットがアクティブかどうか |
+| isMuted | boolean | 通知をミュートしているか |
+| isPinned | boolean | ピン留めされているか |
+| participants | array | 参加者のUID配列 |
+| participantDisplayNames | array | 参加者の表示名配列 |
+| relatedProposalId | string | 関連する提案ID（任意） |
+| relatedEventId | string | 関連するイベントID（任意） |
+| joinedAt | timestamp | このユーザーがチャットに参加した日時 |
+| leftAt | timestamp | チャットから退出した日時（退出時のみ） |
+| role | string | チャット内での役割 ('admin', 'member', 'guest') |
+| customSettings | object | このユーザー固有のチャット設定 |
+| createdAt | timestamp | 作成日時 |
+| updatedAt | timestamp | 最終更新日時 |
+
+**lastMessage オブジェクトの構造**
+```json
+{
+  "messageId": "msg123",
+  "senderUid": "user456",
+  "senderDisplayName": "田中太郎",
+  "content": "明日の件、どうしましょうか？",
+  "type": "text",
+  "timestamp": "2024-06-29T18:00:00Z"
+}
+```
+
+**customSettings オブジェクトの構造**
+```json
+{
+  "notificationLevel": "all",  // "all", "mentions", "none"
+  "theme": "default",
+  "fontSize": "medium",
+  "showTypingIndicator": true,
+  "autoMarkAsRead": true
+}
+```
+
 #### userProposal（usersのサブコレクション）
 ```
 ドキュメントID: {proposalId}
@@ -76,6 +127,25 @@
 | notificationSent | boolean | 通知送信済みかどうか |
 | receivedAt | timestamp | 提案を受信した日時 |
 | updatedAt | timestamp | 最終更新日時 |
+| isRead | boolean | 既読フラグ |
+| personalNote | string | 個人メモ（任意） |
+| priority | number | このユーザーにとっての優先度 |
+| **[提案内容の複製 - フロントエンド取得用]** | | |
+| title | string | 提案タイトル（例：「渋谷で飲み会」） |
+| description | string | 提案の詳細説明 |
+| type | string | 提案種類 ('group_meetup', 'venue_recommendation', 'activity_suggestion') |
+| proposalSource | string | 提案元 ('user', 'ai', 'friend_invite') |
+| creatorDisplayName | string | 提案作成者の表示名 |
+| targetUsers | array | 対象ユーザーリスト（UID配列） |
+| scheduledAt | timestamp | 予定日時 |
+| endTime | timestamp | 終了予定時間（任意） |
+| location | object | 場所情報 |
+| category | string | カテゴリー ('drinking', 'cafe', 'restaurant', 'activity', 'other') |
+| budget | object | 予算情報（最小・最大金額） |
+| capacity | object | 参加人数（最小・最大人数） |
+| responseCount | object | 応答集計 {accepted: number, declined: number, pending: number} |
+| expiresAt | timestamp | 提案の有効期限 |
+| createdAt | timestamp | 作成日時 |
 
 **sharedLocation オブジェクトの構造**
 ```json

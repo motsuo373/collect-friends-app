@@ -70,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'AI提案',
+          title: '提案',
           tabBarIcon: ({ color, size }) => (
             <Icons.Sparkles 
               size={Platform.select({ ios: 24, default: 22 })} 

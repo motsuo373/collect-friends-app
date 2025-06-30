@@ -243,10 +243,10 @@ class GooglePlacesService:
         """
         search_types = set()
         
-        # アクティビティタイプに基づく基本的な検索タイプ
+        # アクティビティタイプに基づく基本的な検索タイプ（日本語強化版）
         activity_type_mapping = {
             "cafe": ["cafe", "bakery", "coffee_shop"],
-            "drink": ["bar", "pub", "night_club", "wine_bar", "cocktail_lounge"],
+            "drink": ["restaurant", "bar", "pub"],  # 居酒屋はrestaurantタイプが多いため先頭に
             "food": ["restaurant", "meal_takeaway", "meal_delivery"],
             "shopping": ["shopping_mall", "store", "supermarket"],
             "movie": ["movie_theater", "entertainment"],
@@ -321,10 +321,10 @@ class GooglePlacesService:
         """
         search_types = set()
         
-        # カジュアル志向のアクティビティタイプマッピング（Google Places API (NEW) 対応）
+        # カジュアル志向のアクティビティタイプマッピング（Google Places API (NEW) 対応 + 日本語強化）
         casual_activity_mapping = {
             "cafe": ["cafe", "restaurant"],  # coffee_shop, fast_foodは非サポート
-            "drink": ["bar", "restaurant", "karaoke"],  # pub, izakaya, night_clubは非サポート
+            "drink": ["restaurant", "bar"],  # 日本の居酒屋はrestaurantタイプが多い
             "food": ["restaurant"],  # meal_takeaway, fast_food, family_restaurantは非サポート
             "shopping": ["shopping_mall"],  # convenience_store, supermarketは制限される可能性
             "movie": [],  # movie_theaterは非サポート
@@ -920,13 +920,40 @@ class GooglePlacesService:
         
         all_restaurants = []
         
-        # カジュアル優先の検索順序で実行
-        priority_types = ["restaurant", "fast_food", "family_restaurant", "pub", "izakaya"]
+        # 日本語キーワード検索を追加（特にdrinkアクティビティに効果的）
+        japanese_keywords = self.get_japanese_keywords_for_activity(
+            activity_types or ["food", "drink"],
+            time_of_day,
+            scene_type
+        )
+        
+        print(f"🗾 Japanese keywords: {japanese_keywords}")
+        
+        # 1. 日本語キーワード検索（優先）
+        if japanese_keywords:
+            for keyword in japanese_keywords[:3]:  # 上位3キーワードのみ
+                print(f"🔍 Japanese keyword search: '{keyword}'")
+                keyword_restaurants = self._search_with_japanese_text_query(
+                    location, radius_m, keyword + " 近く", min(max_results // 2, 8)
+                )
+                
+                # カジュアルフィルタリング即座適用
+                filtered_restaurants = self._apply_casual_filters(
+                    keyword_restaurants,
+                    max_price_per_person,
+                    casual_level,
+                    exclude_high_end
+                )
+                
+                all_restaurants.extend(filtered_restaurants)
+        
+        # 2. 従来のタイプ検索（補完）
+        priority_types = ["restaurant", "bar"]  # 基本タイプに絞る
         other_types = [t for t in search_types if t not in priority_types]
         ordered_types = priority_types + other_types
         
-        # 段階的検索（少ない結果で効率的に）
-        for i in range(0, len(ordered_types), 2):  # 2つずつ処理
+        # タイプ検索は補完として実行
+        for i in range(0, min(len(ordered_types), 4), 2):  # 最大2バッチに制限
             batch_types = ordered_types[i:i+2]
             if not batch_types:
                 continue
@@ -934,7 +961,7 @@ class GooglePlacesService:
             print(f"🔍 Casual search batch: {batch_types}")
             
             restaurants = self._search_with_types(
-                location, radius_m, batch_types, min(max_results, 6)
+                location, radius_m, batch_types, min(max_results, 4)
             )
             
             # カジュアルフィルタリング即座適用
@@ -948,7 +975,7 @@ class GooglePlacesService:
             all_restaurants.extend(filtered_restaurants)
             
             # 十分な結果が得られた場合は終了（効率化）
-            if len(all_restaurants) >= max_results * 1.5:
+            if len(all_restaurants) >= max_results * 2:
                 break
         
         # 重複除去
@@ -985,3 +1012,105 @@ class GooglePlacesService:
         
         print(f"🎯 Casual search completed: {len(unique_restaurants)} restaurants")
         return unique_restaurants[:max_results]
+
+    def get_japanese_keywords_for_activity(
+        self,
+        activity_types: List[str],
+        time_of_day: Optional[str] = None,
+        scene_type: Optional[str] = None
+    ) -> List[str]:
+        """
+        アクティビティタイプから日本語検索キーワードを生成
+        """
+        keywords = []
+        
+        # アクティビティタイプから日本語キーワードへのマッピング
+        activity_keyword_mapping = {
+            "cafe": ["カフェ", "喫茶店", "コーヒー"],
+            "drink": ["居酒屋", "飲み屋", "バー", "酒場", "立ち飲み", "ビアガーデン"],
+            "food": ["レストラン", "食堂", "定食", "和食", "洋食"],
+            "shopping": ["ショッピング", "商店街", "デパート"],
+            "movie": ["映画館", "シネマ"],
+            "walk": ["公園", "散歩道", "カフェ"]
+        }
+        
+        for activity in activity_types:
+            if activity in activity_keyword_mapping:
+                keywords.extend(activity_keyword_mapping[activity])
+        
+        # 時間帯による追加キーワード
+        if time_of_day:
+            if time_of_day in ["night", "late_night"]:
+                if "drink" in activity_types:
+                    keywords.extend(["夜の店", "飲み放題", "宴会"])
+            elif time_of_day == "lunch":
+                keywords.extend(["ランチ", "定食", "昼食"])
+            elif time_of_day in ["breakfast", "brunch"]:
+                keywords.extend(["モーニング", "朝食", "ブランチ"])
+        
+        # シーンタイプによる追加キーワード
+        if scene_type:
+            if scene_type in ["friends", "group_party"]:
+                keywords.extend(["宴会", "歓送迎会", "飲み会"])
+            elif scene_type in ["date", "anniversary"]:
+                keywords.extend(["デート", "記念日", "個室"])
+            elif scene_type == "business":
+                keywords.extend(["接待", "会食", "ビジネス"])
+            elif scene_type == "family":
+                keywords.extend(["ファミリー", "子連れOK", "家族"])
+        
+        return list(set(keywords))  # 重複除去
+        
+    def _search_with_japanese_text_query(
+        self,
+        location: LocationData,
+        radius_m: int,
+        text_query: str,
+        max_results: int
+    ) -> List[RestaurantInfo]:
+        """日本語テキストクエリで検索実行"""
+        
+        payload = {
+            "textQuery": text_query,
+            "locationBias": {
+                "circle": {
+                    "center": {
+                        "latitude": location.latitude,
+                        "longitude": location.longitude
+                    },
+                    "radius": radius_m
+                }
+            },
+            "maxResultCount": min(max_results, 20),
+            "languageCode": "ja"
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-FieldMask": (
+                "places.id,places.displayName,places.formattedAddress,"
+                "places.location,places.types,places.businessStatus,"
+                "places.rating,places.userRatingCount,places.priceLevel,"
+                "places.regularOpeningHours"
+            )
+        }
+        
+        try:
+            response = requests.post(
+                "https://places.googleapis.com/v1/places:searchText",
+                headers=headers,
+                json=payload,
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return self._parse_restaurant_response(data, location)
+            else:
+                print(f"❌ Text Query API Error: {response.status_code} - {response.text}")
+                return []
+                
+        except Exception as e:
+            print(f"❌ Text Query Search error: {str(e)}")
+            return []

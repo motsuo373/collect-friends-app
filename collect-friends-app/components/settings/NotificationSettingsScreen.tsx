@@ -233,14 +233,14 @@ export default function NotificationSettingsScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* AI提案通知 */}
+          {/* 提案通知 */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AI提案</Text>
+            <Text style={styles.sectionTitle}>提案</Text>
             
             <View style={styles.settingItem}>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingName}>AI提案通知</Text>
-                <Text style={styles.settingDescription}>AIからの集まり提案を通知します</Text>
+                <Text style={styles.settingName}>提案通知</Text>
+                <Text style={styles.settingDescription}>集まりの提案を通知します</Text>
               </View>
               <Switch
                 value={settings.ai_proposal.enabled}
@@ -252,7 +252,7 @@ export default function NotificationSettingsScreen({ navigation }: any) {
             <View style={styles.settingItem}>
               <View style={styles.settingInfo}>
                 <Text style={styles.settingName}>プッシュ通知</Text>
-                <Text style={styles.settingDescription}>AI提案をプッシュ通知で受け取ります</Text>
+                <Text style={styles.settingDescription}>提案をプッシュ通知で受け取ります</Text>
               </View>
               <Switch
                 value={settings.ai_proposal.push}

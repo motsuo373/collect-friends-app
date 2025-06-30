@@ -539,6 +539,23 @@ class UserProposal(BaseModel):
     priority: float = Field(0.0, description="このユーザーにとっての優先度")
     received_at: datetime = Field(default_factory=datetime.now, description="受信日時")
     updated_at: datetime = Field(default_factory=datetime.now, description="更新日時")
+    
+    # 提案内容の複製（フロントエンド取得用）
+    title: str = Field(..., description="提案タイトル")
+    description: str = Field(..., description="提案の詳細説明")
+    type: ProposalType = Field(..., description="提案種類")
+    proposal_source: ProposalSource = Field(..., description="提案元")
+    creator_display_name: Optional[str] = Field(None, description="提案作成者の表示名")
+    target_users: List[str] = Field(..., description="対象ユーザーUID配列")
+    scheduled_at: datetime = Field(..., description="予定日時")
+    end_time: Optional[datetime] = Field(None, description="終了予定時間")
+    location: ProposalLocation = Field(..., description="場所情報")
+    category: str = Field(..., description="カテゴリー")
+    budget: ProposalBudget = Field(..., description="予算情報")
+    capacity: ProposalCapacity = Field(..., description="参加人数情報")
+    response_count: ResponseCount = Field(default_factory=ResponseCount, description="応答集計")
+    expires_at: datetime = Field(..., description="提案有効期限")
+    created_at: datetime = Field(..., description="作成日時")
 
 
 class ProposalGenerationRequest(BaseModel):

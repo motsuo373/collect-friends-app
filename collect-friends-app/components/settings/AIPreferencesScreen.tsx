@@ -208,7 +208,7 @@ export default function AIPreferencesScreen({ navigation }: any) {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>AI支援レベル</Text>
             <Text style={styles.sectionDescription}>
-              AIからの提案頻度を設定します
+                              提案の頻度を設定します
             </Text>
             <View style={styles.sliderContainer}>
               <Text style={styles.sliderLabel}>最小限</Text>

@@ -10,10 +10,9 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { signInWithGoogle, signInWithTwitter, signInWithLine, signInWithEmail } from '../utils/auth';
-import { ThemedText } from './ThemedText';
-import { ThemedView } from './ThemedView';
+import { signInWithEmail } from '../utils/auth';
 import SignUpScreen from './SignUpScreen';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -55,36 +54,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      await signInWithGoogle();
-      onLoginSuccess();
-    } catch (error) {
-      console.error('Google login error:', error);
-      Alert.alert('エラー', 'Googleログインに失敗しました');
-    }
-  };
-
-  const handleTwitterLogin = async () => {
-    try {
-      await signInWithTwitter();
-      onLoginSuccess();
-    } catch (error) {
-      console.error('Twitter login error:', error);
-      Alert.alert('エラー', 'Twitterログインに失敗しました');
-    }
-  };
-
-  const handleLineLogin = async () => {
-    try {
-      await signInWithLine();
-      onLoginSuccess();
-    } catch (error) {
-      console.error('LINE login error:', error);
-      Alert.alert('エラー', 'LINEログインに失敗しました');
-    }
-  };
-
   if (showSignUp) {
     return (
       <SignUpScreen
@@ -103,19 +72,23 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <ThemedView style={styles.loginContainer}>
-          <ThemedText style={styles.title}>Collect Friends</ThemedText>
-          <ThemedText style={styles.subtitle}>今すぐ遊べる友達を見つけよう！</ThemedText>
+        <View style={styles.loginContainer}>
+          {/* タイトルセクション */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>Kanjie</Text>
+            <Text style={styles.subtitle}>今すぐ遊べる友達を見つけよう！</Text>
+          </View>
           
-          {/* メール認証フォーム */}
-          <View style={styles.emailForm}>
+          {/* 入力フォーム */}
+          <View style={styles.formSection}>
             <View style={styles.inputContainer}>
               <Text style={styles.label}>メールアドレス</Text>
               <TextInput
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="メールアドレスを入力"
+                placeholder="メールアドレス"
+                placeholderTextColor="#8E8E93"
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -127,19 +100,30 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="パスワードを入力"
+                placeholder="パスワード"
+                placeholderTextColor="#8E8E93"
                 secureTextEntry
               />
             </View>
+          </View>
 
+          {/* ボタンセクション */}
+          <View style={styles.buttonSection}>
             <TouchableOpacity
-              style={[styles.loginButton, loading && styles.buttonDisabled]}
+              style={styles.loginButtonContainer}
               onPress={handleEmailLogin}
               disabled={loading}
             >
-              <Text style={styles.loginButtonText}>
-                {loading ? 'ログイン中...' : 'メールでログイン'}
-              </Text>
+              <LinearGradient
+                colors={['#FF7300', '#FF9C00']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.loginButton, loading && styles.buttonDisabled]}
+              >
+                <Text style={styles.loginButtonText}>
+                  {loading ? 'ログイン中...' : 'メールでログイン'}
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -151,28 +135,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               </Text>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>または</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* SNSログインボタン */}
-          <View style={styles.socialButtonsContainer}>
-            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-              <Text style={styles.googleButtonText}>Googleでログイン</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.twitterButton} onPress={handleTwitterLogin}>
-              <Text style={styles.twitterButtonText}>Twitterでログイン</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.lineButton} onPress={handleLineLogin}>
-              <Text style={styles.lineButtonText}>LINEでログイン</Text>
-            </TouchableOpacity>
-          </View>
-        </ThemedView>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -181,131 +144,82 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 112, // Status bar + some spacing
   },
   loginContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    flex: 1,
+  },
+  titleSection: {
+    alignItems: 'center',
+    marginBottom: 60,
   },
   title: {
-    fontSize: 32,
+    fontSize: 48,
     fontWeight: 'bold',
+    color: '#FF8700',
+    letterSpacing: 0.48,
     textAlign: 'center',
-    marginBottom: 10,
-    color: '#333',
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
+    color: '#222222',
     textAlign: 'center',
-    marginBottom: 30,
-    color: '#666',
+    lineHeight: 20,
   },
-  emailForm: {
-    marginBottom: 20,
+  formSection: {
+    marginBottom: 60,
   },
   inputContainer: {
-    marginBottom: 15,
+    marginBottom: 24,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#222222',
     marginBottom: 8,
-    color: '#333',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
+    height: 44,
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    color: '#222222',
+  },
+  buttonSection: {
+    width: '100%',
+  },
+  loginButtonContainer: {
+    width: '100%',
+    marginBottom: 12,
   },
   loginButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 15,
+    height: 48,
+    borderRadius: 32.5,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.7,
   },
   loginButtonText: {
-    color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
   signUpLink: {
-    marginTop: 15,
-    alignItems: 'center',
+    paddingVertical: 12,
   },
   signUpLinkText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ddd',
-  },
-  dividerText: {
-    marginHorizontal: 15,
-    color: '#666',
-    fontSize: 14,
-  },
-  socialButtonsContainer: {
-    gap: 15,
-  },
-  googleButton: {
-    backgroundColor: '#4285F4',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-  },
-  googleButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
-  },
-  twitterButton: {
-    backgroundColor: '#1DA1F2',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-  },
-  twitterButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  lineButton: {
-    backgroundColor: '#00C300',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-  },
-  lineButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#FF8700',
+    textAlign: 'center',
   },
 }); 

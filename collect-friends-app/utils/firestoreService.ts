@@ -211,6 +211,30 @@ export const firestoreQueries = {
   limit
 };
 
+/**
+ * ユーザーの提案への応答を更新
+ * @param userUid - ユーザーUID
+ * @param proposalId - 提案ID
+ * @param status - 応答ステータス ('pending', 'accepted', 'declined', 'maybe')
+ * @returns Promise<void>
+ */
+export const updateProposalResponse = async (
+  userUid: string,
+  proposalId: string,
+  status: 'pending' | 'accepted' | 'declined' | 'maybe'
+): Promise<void> => {
+  try {
+    const userProposalPath = `users/${userUid}/userProposal/${proposalId}`;
+    await updateDocument(userProposalPath, {
+      status,
+      respondedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error(`提案応答更新エラー (${proposalId}):`, error);
+    throw error;
+  }
+};
+
 export const firestoreService = {
   setDocument,
   getDocument,
@@ -218,5 +242,6 @@ export const firestoreService = {
   deleteDocument,
   getCollection,
   getCollectionWithQuery,
-  addDocument
+  addDocument,
+  updateProposalResponse
 }; 

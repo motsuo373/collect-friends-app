@@ -158,38 +158,46 @@ class FirestoreService:
     async def update_proposal_response(self, user_uid: str, proposal_id: str, response_status: UserResponseStatus) -> bool:
         """ユーザーの提案応答を更新"""
         try:
-            # userProposalを更新
+            # 元のproposalを取得・更新
+            proposal_ref = self.db.collection('proposals').document(proposal_id)
+            proposal_doc = proposal_ref.get()
+            
+            if not proposal_doc.exists:
+                print(f"❌ Proposal {proposal_id} not found")
+                return False
+            
+            proposal_data = proposal_doc.to_dict()
+            
+            # responses辞書を更新
+            responses = proposal_data.get('responses', {})
+            responses[user_uid] = {
+                'status': response_status.value,
+                'responded_at': datetime.now()
+            }
+            
+            # response_countを更新
+            response_count = self._calculate_response_count(responses)
+            
+            proposal_ref.update({
+                'responses': responses,
+                'response_count': response_count,
+                'updated_at': datetime.now()
+            })
+            
+            # userProposalを更新（statusと新しいresponse_countを含む）
             user_proposal_ref = (self.db.collection('users').document(user_uid)
                                .collection('userProposal').document(proposal_id))
             
             user_proposal_ref.update({
                 'status': response_status.value,
                 'responded_at': datetime.now(),
-                'updated_at': datetime.now()
+                'updated_at': datetime.now(),
+                'response_count': response_count,  # 最新のresponse_countを同期
+                'is_read': True  # 応答時に既読にする
             })
             
-            # 元のproposalも更新
-            proposal_ref = self.db.collection('proposals').document(proposal_id)
-            proposal_doc = proposal_ref.get()
-            
-            if proposal_doc.exists:
-                proposal_data = proposal_doc.to_dict()
-                
-                # responses辞書を更新
-                responses = proposal_data.get('responses', {})
-                responses[user_uid] = {
-                    'status': response_status.value,
-                    'responded_at': datetime.now()
-                }
-                
-                # response_countを更新
-                response_count = self._calculate_response_count(responses)
-                
-                proposal_ref.update({
-                    'responses': responses,
-                    'response_count': response_count,
-                    'updated_at': datetime.now()
-                })
+            # 全ての対象ユーザーのuserProposalでresponse_countを同期
+            await self._sync_response_count_to_user_proposals(proposal_id, proposal_data.get('target_users', []), response_count)
             
             print(f"✅ Proposal response updated: {user_uid} -> {proposal_id} ({response_status.value})")
             return True
@@ -197,6 +205,26 @@ class FirestoreService:
         except Exception as e:
             print(f"❌ Error updating proposal response: {str(e)}")
             return False
+    
+    async def _sync_response_count_to_user_proposals(self, proposal_id: str, target_users: List[str], response_count: dict):
+        """全ての対象ユーザーのuserProposalにresponse_countを同期"""
+        try:
+            for target_user_uid in target_users:
+                user_proposal_ref = (self.db.collection('users').document(target_user_uid)
+                                   .collection('userProposal').document(proposal_id))
+                
+                # userProposalが存在する場合のみ更新
+                user_proposal_doc = user_proposal_ref.get()
+                if user_proposal_doc.exists:
+                    user_proposal_ref.update({
+                        'response_count': response_count,
+                        'updated_at': datetime.now()
+                    })
+            
+            print(f"✅ Response count synced to user proposals for proposal {proposal_id}")
+        
+        except Exception as e:
+            print(f"❌ Error syncing response count to user proposals: {str(e)}")
     
     async def get_user_proposals(self, user_uid: str, limit: int = 10) -> List[Dict[str, Any]]:
         """ユーザーの提案を取得"""

@@ -52,6 +52,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiDomain": "http://localhost:8000"
     }
   }
 }

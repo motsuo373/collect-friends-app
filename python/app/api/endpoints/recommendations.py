@@ -128,6 +128,90 @@ async def get_restaurant_search_status():
         }
 
 
+@router.get("/debug/japanese-keyword-test")
+async def test_japanese_keyword_search():
+    """日本語キーワード検索のテスト用エンドポイント"""
+    try:
+        places_service = GooglePlacesService()
+        
+        # テスト位置（渋谷駅周辺）
+        test_location = LocationData(latitude=35.6580, longitude=139.7016)
+        
+        # drinkアクティビティの日本語キーワードを取得
+        keywords = places_service.get_japanese_keywords_for_activity(
+            activity_types=["drink"],
+            time_of_day="night",
+            scene_type="friends"
+        )
+        
+        # 各キーワードでテスト検索
+        search_results = {}
+        for keyword in keywords[:3]:  # 上位3キーワードのみテスト
+            print(f"🔍 Testing keyword: '{keyword}'")
+            results = places_service._search_with_japanese_text_query(
+                location=test_location,
+                radius_m=1000,
+                text_query=keyword + " 近く",
+                max_results=5
+            )
+            
+            search_results[keyword] = [
+                {
+                    "name": r.name,
+                    "type": r.type,
+                    "cuisine_type": r.cuisine_type,
+                    "rating": r.rating,
+                    "price_level": r.price_level,
+                    "distance_km": r.distance_from_station_km,
+                    "address": r.address
+                } for r in results
+            ]
+        
+        # 従来の英語タイプ検索との比較
+        traditional_types = places_service.get_search_types_for_scene(["drink"])
+        traditional_results = places_service._search_with_types(
+            location=test_location,
+            radius_m=1000,
+            search_types=traditional_types,
+            max_results=5
+        )
+        
+        return {
+            "test_location": {
+                "latitude": test_location.latitude,
+                "longitude": test_location.longitude,
+                "description": "Shibuya Station area"
+            },
+            "japanese_keywords": keywords,
+            "japanese_keyword_results": search_results,
+            "traditional_search_types": traditional_types,
+            "traditional_results": [
+                {
+                    "name": r.name,
+                    "type": r.type,
+                    "cuisine_type": r.cuisine_type,
+                    "rating": r.rating,
+                    "price_level": r.price_level,
+                    "distance_km": r.distance_from_station_km
+                } for r in traditional_results
+            ],
+            "comparison": {
+                "japanese_total": sum(len(results) for results in search_results.values()),
+                "traditional_total": len(traditional_results),
+                "improvement": "Japanese keyword search found more relevant drinking establishments" if sum(len(results) for results in search_results.values()) > len(traditional_results) else "Traditional search performed better"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 @router.post(
     "/activity-recommendations",
     response_model=ActivityRecommendationResponse,

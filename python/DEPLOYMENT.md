@@ -1,4 +1,4 @@
-# Google Cloud Run デプロイメントガイド
+# Google Cloud Run デプロイメントガイド（改善版）
 
 このガイドでは、位置情報ベースアクティビティ推奨システムをGoogle Cloud Runにデプロイし、Cloud Schedulerでスケジュール実行する方法を説明します。
 
@@ -26,28 +26,27 @@ gcloud config set project YOUR_PROJECT_ID
 ### 2. 必要なAPIの有効化
 
 ```bash
+# 基本API
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable run.googleapis.com
-gcloud services enable containerregistry.googleapis.com
+gcloud services enable artifactregistry.googleapis.com
 gcloud services enable cloudscheduler.googleapis.com
+gcloud services enable secretmanager.googleapis.com
 gcloud services enable redis.googleapis.com
+
+# Firebase連携（必要に応じて）
+gcloud services enable firestore.googleapis.com
 ```
 
-### 3. サービスアカウントの作成
+### 3. 必要な環境変数の設定
 
 ```bash
-# サービスアカウントの作成
-gcloud iam service-accounts create activity-api-sa \
-    --display-name="Activity Recommendation API Service Account"
-
-# 必要な権限の付与
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:activity-api-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/run.invoker"
-
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-    --member="serviceAccount:activity-api-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/redis.editor"
+# 設定値の準備
+export PROJECT_ID="your-actual-project-id"
+export REGION="asia-northeast1"
+export GOOGLE_PLACES_API_KEY="your-google-places-api-key"
+export GEMINI_API_KEY="your-gemini-api-key"
+export REDIS_HOST="your-redis-ip-address"  # Memorystore作成後に設定
 ```
 
 ## 🗄️ データベース（Redis）のセットアップ
@@ -58,134 +57,113 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
 # Memorystore Redisインスタンスの作成
 gcloud redis instances create activity-redis \
     --size=1 \
-    --region=asia-northeast1 \
-    --redis-version=redis_6_x
+    --region=$REGION \
+    --redis-version=redis_6_x \
+    --network=default \
+    --connect-mode=DIRECT_PEERING
 
 # 接続情報の取得
-gcloud redis instances describe activity-redis --region=asia-northeast1
+REDIS_HOST=$(gcloud redis instances describe activity-redis \
+    --region=$REGION --format='value(host)')
+echo "Redis Host: $REDIS_HOST"
+
+# 環境変数に設定
+export REDIS_HOST=$REDIS_HOST
 ```
 
 ## 🚀 Cloud Run へのデプロイ
 
-### 方法1: 自動デプロイ（推奨）
+### 自動デプロイ（推奨）
 
-1. `deploy.sh` ファイルを編集して設定値を更新：
+1. **設定ファイルの更新**：
 
 ```bash
 # deploy.sh の設定値を編集
-PROJECT_ID="your-actual-project-id"
-REGION="asia-northeast1"
-SERVICE_NAME="activity-recommendation-api"
+sed -i "s/your-gcp-project-id/$PROJECT_ID/g" deploy.sh
+sed -i "s/your-redis-host/$REDIS_HOST/g" deploy.sh
 ```
 
-2. 環境変数を設定：
-
-```bash
-export GOOGLE_PLACES_API_KEY="your-google-places-api-key"
-export GEMINI_API_KEY="your-gemini-api-key"
-```
-
-3. デプロイスクリプトを実行：
+2. **デプロイスクリプトを実行**：
 
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 方法2: 手動デプロイ
-
-```bash
-# 1. Dockerイメージをビルド
-docker build -t gcr.io/YOUR_PROJECT_ID/activity-recommendation-api .
-
-# 2. Container Registryにプッシュ
-docker push gcr.io/YOUR_PROJECT_ID/activity-recommendation-api
-
-# 3. Cloud Runにデプロイ
-gcloud run deploy activity-recommendation-api \
-  --image gcr.io/YOUR_PROJECT_ID/activity-recommendation-api \
-  --region asia-northeast1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --port 8080 \
-  --memory 1Gi \
-  --cpu 1 \
-  --timeout 300 \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID" \
-  --set-env-vars "REDIS_HOST=REDIS_IP_ADDRESS" \
-  --set-env-vars "GOOGLE_PLACES_API_KEY=YOUR_API_KEY" \
-  --set-env-vars "GEMINI_API_KEY=YOUR_GEMINI_KEY"
-```
-
-### 方法3: Cloud Build による自動デプロイ
+### Cloud Build による自動デプロイ
 
 ```bash
 # cloudbuild.yaml を使用したビルド
 gcloud builds submit --config cloudbuild.yaml \
-  --substitutions _REGION=asia-northeast1,_REDIS_URL=redis://REDIS_IP:6379
+  --substitutions _REGION=$REGION,_REDIS_HOST=$REDIS_HOST
 ```
 
 ## ⏰ Cloud Scheduler でのスケジュール実行
 
-### 1. スケジューラーのセットアップ
-
-1. `setup-scheduler.sh` ファイルを編集：
+### スケジューラーのセットアップ
 
 ```bash
-PROJECT_ID="your-actual-project-id"
-REGION="asia-northeast1"
-SERVICE_ACCOUNT_EMAIL="activity-api-sa@your-project-id.iam.gserviceaccount.com"
-CLOUD_RUN_URL="https://your-actual-cloud-run-url"
-```
+# setup-scheduler.sh の設定値を編集
+sed -i "s/your-gcp-project-id/$PROJECT_ID/g" setup-scheduler.sh
 
-2. スケジューラーをセットアップ：
-
-```bash
+# スケジューラーをセットアップ
 chmod +x setup-scheduler.sh
 ./setup-scheduler.sh
 ```
 
-### 2. 利用可能なスケジュールジョブ
+### 作成されるスケジュールジョブ
 
-- **毎時実行**: レコメンデーション更新（`0 * * * *`）
-- **毎日実行**: キャッシュクリーンアップ（`0 2 * * *`）
+| ジョブ名 | スケジュール | 説明 |
+|----------|-------------|------|
+| `ai-proposal-generation-morning` | 9:00 AM 毎日 | 朝のAI提案生成 |
+| `ai-proposal-generation-afternoon` | 1:00 PM 毎日 | 昼のAI提案生成 |
+| `ai-proposal-generation-evening` | 5:00 PM 毎日 | 夕方のAI提案生成 |
+| `cache-cleanup-daily` | 2:00 AM 毎日 | キャッシュクリーンアップ |
 
-### 3. スケジュールの管理
-
-```bash
-# ジョブの一覧確認
-gcloud scheduler jobs list --location=asia-northeast1
-
-# ジョブの実行
-gcloud scheduler jobs run JOB_NAME --location=asia-northeast1
-
-# ジョブの停止
-gcloud scheduler jobs pause JOB_NAME --location=asia-northeast1
-
-# ジョブの再開
-gcloud scheduler jobs resume JOB_NAME --location=asia-northeast1
-```
-
-## 🔧 構成オプション
+## 🔧 設定オプション
 
 ### 環境変数
 
-| 変数名 | 説明 | デフォルト値 |
-|--------|------|-------------|
-| `GOOGLE_CLOUD_PROJECT` | GCPプロジェクトID | - |
-| `REDIS_HOST` | RedisホストIP | localhost |
-| `REDIS_PORT` | Redisポート | 6379 |
-| `GOOGLE_PLACES_API_KEY` | Google Places API Key | - |
-| `GEMINI_API_KEY` | Gemini API Key | - |
-| `DEBUG` | デバッグモード | false |
+| 変数名 | 説明 | 取得方法 |
+|--------|------|----------|
+| `GOOGLE_CLOUD_PROJECT` | GCPプロジェクトID | 自動設定 |
+| `REDIS_HOST` | RedisホストIP | Memorystore作成後 |
+| `REDIS_PORT` | Redisポート | 6379（デフォルト） |
+| `GOOGLE_PLACES_API_KEY` | Google Places API Key | Secret Manager経由 |
+| `GEMINI_API_KEY` | Gemini API Key | Secret Manager経由 |
 
 ### Cloud Run 設定
 
-- **メモリ**: 1Gi（推奨最小値）
-- **CPU**: 1（推奨最小値）
+- **メモリ**: 1Gi
+- **CPU**: 1
 - **並行性**: 80リクエスト
 - **タイムアウト**: 300秒
-- **ポート**: 8080
+- **最小インスタンス数**: 0
+- **最大インスタンス数**: 10
+
+## 🔐 セキュリティ設定
+
+### Secret Manager の活用
+
+```bash
+# Secretsの作成
+echo -n "$GOOGLE_PLACES_API_KEY" | gcloud secrets create google-places-api-key --data-file=-
+echo -n "$GEMINI_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
+
+# サービスアカウントへの権限付与
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:activity-api-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+```
+
+### サービスアカウント権限
+
+作成されるサービスアカウント `activity-api-sa` には以下の権限が付与されます：
+
+- `roles/run.invoker`: Cloud Run呼び出し
+- `roles/redis.editor`: Redis接続
+- `roles/secretmanager.secretAccessor`: Secret Manager読み取り
+- `roles/datastore.user`: Firestore読み書き
 
 ## 📊 監視とログ
 
@@ -193,117 +171,179 @@ gcloud scheduler jobs resume JOB_NAME --location=asia-northeast1
 
 ```bash
 # ログの確認
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=activity-recommendation-api" --limit=50
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=activity-recommendation-api" --limit=50 --format="table(timestamp,severity,textPayload)"
+
+# エラーログのフィルタ
+gcloud logging read "resource.type=cloud_run_revision AND severity>=ERROR" --limit=20
 ```
 
 ### Cloud Monitoring
 
-- CPU使用率
-- メモリ使用率
-- リクエスト数
-- レスポンス時間
-- エラー率
+```bash
+# メトリクスの確認
+gcloud monitoring metrics list --filter="resource.type=cloud_run_revision"
 
-## 🛠️ トラブルシューティング
+# ダッシュボードURL
+echo "https://console.cloud.google.com/monitoring/dashboards?project=$PROJECT_ID"
+```
 
-### よくある問題
-
-1. **Redis接続エラー**
-   - Memorystore Redisのプライベートネットワーク設定を確認
-   - VPC Connectorの設定（必要な場合）
-
-2. **API Key エラー**
-   - 環境変数の設定を確認
-   - APIの有効化状況を確認
-
-3. **タイムアウトエラー**
-   - Cloud Runのタイムアウト設定を調整
-   - 並列処理の設定を見直し
-
-### デバッグコマンド
+### スケジューラージョブの監視
 
 ```bash
-# サービスの詳細確認
-gcloud run services describe activity-recommendation-api --region=asia-northeast1
+# ジョブ実行履歴の確認
+gcloud scheduler jobs describe ai-proposal-generation-morning \
+    --location=$REGION \
+    --format="table(status.lastAttemptTime,status.state)"
 
-# 最新リビジョンのログ確認
-gcloud run services logs read activity-recommendation-api --region=asia-northeast1
+# 失敗したジョブの確認
+gcloud logging read "resource.type=cloud_scheduler_job AND severity=ERROR" --limit=10
+```
 
-# スケジューラージョブの実行履歴
-gcloud scheduler jobs describe JOB_NAME --location=asia-northeast1
+## 🚨 トラブルシューティング
+
+### よくある問題と解決方法
+
+#### 1. デプロイエラー
+
+```bash
+# 権限エラーの場合
+gcloud auth application-default login
+
+# Artifact Registry認証エラー
+gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+```
+
+#### 2. Secret Manager エラー
+
+```bash
+# Secretの存在確認
+gcloud secrets list
+
+# Secretの値確認
+gcloud secrets versions access latest --secret="google-places-api-key"
+```
+
+#### 3. Redis接続エラー
+
+```bash
+# Redisインスタンスの状態確認
+gcloud redis instances describe activity-redis --region=$REGION
+
+# ネットワーク設定確認
+gcloud compute networks describe default
+```
+
+#### 4. スケジューラージョブの失敗
+
+```bash
+# ジョブの手動実行
+gcloud scheduler jobs run ai-proposal-generation-morning --location=$REGION
+
+# ログの確認
+gcloud logging read "resource.type=cloud_scheduler_job" --limit=10
+```
+
+### ヘルスチェック
+
+```bash
+# Cloud Runサービスの確認
+SERVICE_URL=$(gcloud run services describe activity-recommendation-api \
+    --region=$REGION --format='value(status.url)')
+
+curl "$SERVICE_URL/health"
+```
+
+## 🔄 アップデートとメンテナンス
+
+### アプリケーションの更新
+
+```bash
+# コードを更新後
+./deploy.sh
+
+# 特定のイメージタグでデプロイ
+gcloud run deploy activity-recommendation-api \
+    --image asia-northeast1-docker.pkg.dev/$PROJECT_ID/activity-api/activity-recommendation-api:v1.1.0 \
+    --region=$REGION
+```
+
+### スケジューラーの更新
+
+```bash
+# ジョブの停止
+gcloud scheduler jobs pause ai-proposal-generation-morning --location=$REGION
+
+# ジョブの再開
+gcloud scheduler jobs resume ai-proposal-generation-morning --location=$REGION
+
+# スケジュールの変更
+gcloud scheduler jobs update http ai-proposal-generation-morning \
+    --schedule="0 8 * * *" --location=$REGION
+```
+
+### バックアップとリストア
+
+```bash
+# Firestoreエクスポート（必要に応じて）
+gcloud firestore export gs://your-backup-bucket
+
+# 設定のバックアップ
+gcloud scheduler jobs list --location=$REGION --format=json > scheduler-backup.json
 ```
 
 ## 💰 コスト最適化
 
 ### 推奨設定
 
-1. **最小インスタンス数**: 0（コールドスタート許容時）
-2. **最大インスタンス数**: 10-100（トラフィックに応じて）
-3. **CPU割り当て**: リクエスト処理中のみ
-4. **Redis**: 必要最小サイズから開始
+1. **Cloud Run**: 最小インスタンス数を0に設定
+2. **Redis**: 必要に応じてサイズを調整
+3. **Logging**: ログ保持期間を30日に設定
+4. **Monitoring**: アラートを設定して異常時のみ通知
 
 ### コスト監視
 
 ```bash
-# Cloud Run の利用状況確認
-gcloud run services list
-gcloud run revisions list
-
-# Cloud Scheduler の利用状況確認
-gcloud scheduler jobs list --location=asia-northeast1
+# 予算アラートの設定
+gcloud billing budgets create \
+    --billing-account=BILLING_ACCOUNT_ID \
+    --display-name="Activity API Budget" \
+    --budget-amount=100USD \
+    --threshold-rules=percent=90,basis=CURRENT_SPEND
 ```
 
-## 🔒 セキュリティ
+## 📈 スケーリング
 
-### 推奨事項
-
-1. **認証の有効化**: 本番環境では`--no-allow-unauthenticated`を使用
-2. **IAM権限の最小化**: 必要最小限の権限のみ付与
-3. **シークレット管理**: Secret Managerの使用を検討
-4. **VPC設定**: プライベートネットワークでの運用
-
-### セキュリティコマンド
+### 負荷対応
 
 ```bash
-# IAM ポリシーの確認
-gcloud run services get-iam-policy activity-recommendation-api --region=asia-northeast1
-
-# 認証の設定
+# 最大インスタンス数の増加
 gcloud run services update activity-recommendation-api \
-  --region=asia-northeast1 \
-  --no-allow-unauthenticated
+    --max-instances=50 \
+    --region=$REGION
+
+# CPUとメモリの調整
+gcloud run services update activity-recommendation-api \
+    --cpu=2 --memory=2Gi \
+    --region=$REGION
 ```
 
-## 🔄 CI/CD パイプライン
+### Redis スケーリング
 
-### GitHub Actions の設定例
-
-```yaml
-name: Deploy to Cloud Run
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud builds submit --config cloudbuild.yaml
+```bash
+# Redisインスタンスのサイズ変更
+gcloud redis instances patch activity-redis \
+    --size=5 --region=$REGION
 ```
 
-## 📞 サポート
+## 🎯 本番運用チェックリスト
 
-問題が発生した場合は、以下を確認してください：
-
-1. Google Cloud Statusページ
-2. プロジェクトの課金状況
-3. API制限とクォータ
-4. ネットワーク設定
-5. ログとメトリクス 
+- [ ] プロジェクトIDを実際の値に変更
+- [ ] API Keyを取得してSecret Managerに設定
+- [ ] Redis インスタンス作成と接続確認
+- [ ] Cloud Run デプロイ成功確認
+- [ ] スケジューラージョブ作成確認
+- [ ] ヘルスチェックエンドポイント確認
+- [ ] ログ監視設定
+- [ ] アラート設定
+- [ ] バックアップ設定
+- [ ] セキュリティ監査 

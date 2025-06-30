@@ -43,10 +43,15 @@ export const Icons = (() => {
     Edit: iconLib.Edit,
     Crosshair: iconLib.Crosshair,
     AlertTriangle: iconLib.AlertTriangle,
+    Plus: iconLib.Plus,
+    Copy: iconLib.Copy,
+    UserPlus: iconLib.UserPlus,
+    Search: iconLib.Search,
     
     // アクティビティアイコン
     Coffee: iconLib.Coffee,
     Wine: iconLib.Wine,
+    Beer: iconLib.Beer,
     Compass: iconLib.Compass,
     ShoppingBag: iconLib.ShoppingBag,
     Play: iconLib.Play,
