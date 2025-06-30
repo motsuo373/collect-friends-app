@@ -54,7 +54,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiDomain": "https://your-service-name-123456789-an.a.run.app",
+      "apiDomain": "https://activity-recommendation-api-127211767674.asia-northeast1.run.app",
       "apiVersion": "v1",
       "development": {
         "apiDomain": "http://localhost:8000"
