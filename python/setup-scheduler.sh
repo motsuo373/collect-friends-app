@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 設定値（実際の値に変更してください）
-PROJECT_ID="your-gcp-project-id"
+PROJECT_ID="collect-friends-app-463813"
 REGION="asia-northeast1"
 SERVICE_NAME="activity-recommendation-api"
 SERVICE_ACCOUNT_EMAIL="activity-api-sa@$PROJECT_ID.iam.gserviceaccount.com"

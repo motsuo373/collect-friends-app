@@ -137,6 +137,7 @@ export default function FriendsScreen() {
   
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     availabilityStatus: [], // デフォルトで空
     activities: [], // デフォルトで空
@@ -242,8 +243,7 @@ export default function FriendsScreen() {
 
   const handleInvite = () => {
     if (selectedFriends.length > 0) {
-      // TODO: 実際の招待処理を実装
-      alert(`${selectedFriends.length}人の友達を誘いました！`);
+      setIsInviteModalVisible(true);
       setSelectedFriends([]);
     }
   };
@@ -405,6 +405,12 @@ export default function FriendsScreen() {
         filters={filters}
         onFiltersChange={setFilters}
       />
+
+      {/* 誘うモーダル */}
+      <InviteModal
+        visible={isInviteModalVisible}
+        onClose={() => setIsInviteModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -538,6 +544,52 @@ const FilterModal: React.FC<FilterModalProps> = ({ visible, onClose, filters, on
           </TouchableOpacity>
         </View>
       </ThemedView>
+    </Modal>
+  );
+};
+
+// 誘うモーダルコンポーネント
+interface InviteModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+const InviteModal: React.FC<InviteModalProps> = ({ visible, onClose }) => {
+  return (
+    <Modal 
+      visible={visible} 
+      transparent={true} 
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={tw`flex-1 bg-black bg-opacity-50 justify-center items-center px-8`}>
+        <View style={tw`bg-white rounded-2xl p-8 items-center min-w-[280px]`}>
+          {/* チェックマークアイコン */}
+          <View style={tw`mb-6`}>
+            <Icons.CircleCheck size={64} color="#FF8700" />
+          </View>
+          
+          {/* 誘いましたテキスト */}
+          <Text style={tw`text-[#FF8700] text-2xl font-bold mb-4`}>
+            誘いました
+          </Text>
+          
+          {/* 機能未実装の注記 */}
+          <Text style={tw`text-gray-500 text-sm text-center mb-8`}>
+            ※現在はこの機能はありません。
+          </Text>
+          
+          {/* 閉じるボタン */}
+          <TouchableOpacity
+            style={tw`bg-[#FF8700] rounded-xl px-8 py-3 min-w-[120px]`}
+            onPress={onClose}
+          >
+            <Text style={tw`text-white font-semibold text-center`}>
+              OK
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 };

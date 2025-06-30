@@ -3,8 +3,8 @@
 # 設定値（実際の値に変更してください）
 PROJECT_ID="collect-friends-app-463813"
 REGION="asia-northeast1"
-SERVICE_NAME="collect-friends-app"
-REPOSITORY_NAME="collect-friends-app"
+SERVICE_NAME="activity-recommendation-api"
+REPOSITORY_NAME="activity-api"
 IMAGE_NAME="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY_NAME/$SERVICE_NAME"
 
 # 色付きの出力
@@ -73,30 +73,35 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:activity-api-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/datastore.user"
 
-# 7. Dockerイメージをビルドして push
-echo -e "${YELLOW}🏗️ Dockerイメージをビルド中...${NC}"
-docker build -t $IMAGE_NAME .
+# 7. RedisインスタンスのIPアドレスを取得
+echo -e "${YELLOW}📍 Redis IPアドレスを取得中...${NC}"
+REDIS_IP=$(gcloud redis instances describe collect-friends-redis --region=$REGION --format='value(host)')
+echo -e "${GREEN}🔍 Redis IP: $REDIS_IP${NC}"
 
-echo -e "${YELLOW}📤 Dockerイメージをプッシュ中...${NC}"
-docker push $IMAGE_NAME
+# 8. Cloud Buildでイメージをビルドして push
+echo -e "${YELLOW}🏗️ Cloud Buildでイメージをビルド中...${NC}"
+gcloud builds submit --tag $IMAGE_NAME
 
-# 8. Cloud Run にデプロイ
+# 9. Cloud Run にデプロイ
 echo -e "${YELLOW}🚀 Cloud Runにデプロイ中...${NC}"
 gcloud run deploy $SERVICE_NAME \
-  --image $IMAGE_NAME \
-  --region $REGION \
-  --platform managed \
-  --allow-unauthenticated \
-  --port 8080 \
-  --memory 1Gi \
-  --cpu 1 \
-  --concurrency 80 \
-  --timeout 300 \
-  --min-instances 0 \
-  --max-instances 10 \
-  --service-account "activity-api-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,REDIS_HOST=$REDIS_HOST,REDIS_PORT=6379" \
-  --update-secrets "GOOGLE_PLACES_API_KEY=google-places-api-key:latest,GEMINI_API_KEY=gemini-api-key:latest"
+    --image=$IMAGE_NAME \
+    --platform=managed \
+    --region=$REGION \
+    --allow-unauthenticated \
+    --service-account="activity-api-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --set-env-vars="REDIS_URL=redis://$REDIS_IP:6379" \
+    --set-secrets="GOOGLE_PLACES_API_KEY=google-places-api-key:latest,GEMINI_API_KEY=gemini-api-key:latest" \
+    --memory=2Gi \
+    --cpu=1 \
+    --timeout=300 \
+    --concurrency=80 \
+    --min-instances=0 \
+    --max-instances=10 \
+    --port=8080 \
+    --vpc-egress=all \
+    --network=projects/$PROJECT_ID/global/networks/default \
+    --subnet=projects/$PROJECT_ID/regions/$REGION/subnetworks/default
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ デプロイが正常に完了しました！${NC}"

@@ -1,7 +1,7 @@
 // ユーザー関連の関数をエクスポート
 export * from './nearby';
-// export * from './profile';
-// export * from './relationships';
+export * from './friends';
+export * from './profile';
 
 // プレースホルダー
 export const usersPlaceholder = () => {}; 

@@ -322,13 +322,14 @@
 | expiresAt | timestamp | 提案の有効期限 |
 | relatedEventRef | reference | 関連イベントへの参照（確定後） |
 | relatedChatRef | reference | 関連チャットへの参照 |
+| activeChatId | string | アクティブなチャットID（参加者が複数いる場合） |
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 最終更新日時 |
 
 **location オブジェクトの構造**
 ```json
 {
-  "name": "焼肉居酒屋Kanjie 渋谷店",
+  "name": "焼肉居酒屋Kanzy 渋谷店",
   "address": "東京都渋谷区...",
   "coordinates": {
     "lat": 35.6580,

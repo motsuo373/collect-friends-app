@@ -1,5 +1,6 @@
 import json
 import hashlib
+import asyncio
 from typing import Optional, Any
 import redis.asyncio as redis
 from datetime import timedelta
@@ -13,25 +14,69 @@ class CacheService:
     def __init__(self):
         self.settings = get_settings()
         self.redis = None
+        self.connection_retries = 0
+        self.max_retries = 3
     
     async def connect(self):
-        """Redis接続を初期化"""
-        try:
-            self.redis = redis.from_url(
-                self.settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True
-            )
-            await self.redis.ping()
-            print("Redis connection established")
-        except Exception as e:
-            print(f"Redis connection failed: {str(e)}")
+        """Redis接続を初期化（失敗してもアプリケーション起動を停止しない）"""
+        for attempt in range(self.max_retries):
+            try:
+                print(f"Attempting Redis connection (attempt {attempt + 1}/{self.max_retries})...")
+                
+                # 短いタイムアウトでRedis接続を試行
+                self.redis = redis.from_url(
+                    self.settings.REDIS_URL,
+                    encoding="utf-8",
+                    decode_responses=True,
+                    socket_connect_timeout=5,  # 接続タイムアウト5秒
+                    socket_timeout=3,          # 操作タイムアウト3秒
+                    retry_on_timeout=True,
+                    retry_on_error=[redis.ConnectionError, redis.TimeoutError],
+                    max_connections=10
+                )
+                
+                # 接続テスト（短いタイムアウトで）
+                await asyncio.wait_for(self.redis.ping(), timeout=3)
+                print(f"✅ Redis connection established successfully!")
+                self.connection_retries = 0
+                return
+                
+            except asyncio.TimeoutError:
+                print(f"⏰ Redis connection timeout on attempt {attempt + 1}")
+            except redis.ConnectionError as e:
+                print(f"🔌 Redis connection error on attempt {attempt + 1}: {str(e)}")
+            except Exception as e:
+                print(f"❌ Redis connection failed on attempt {attempt + 1}: {str(e)}")
+            
+            # 失敗した場合はRedisをNoneに設定
             self.redis = None
+            
+            # 最後の試行でない場合は少し待つ
+            if attempt < self.max_retries - 1:
+                await asyncio.sleep(1)
+        
+        print(f"⚠️  Redis connection failed after {self.max_retries} attempts. Continuing without cache.")
+        self.redis = None
     
     async def disconnect(self):
         """Redis接続を閉じる"""
         if self.redis:
-            await self.redis.aclose()
+            try:
+                await self.redis.aclose()
+                print("Redis connection closed")
+            except Exception as e:
+                print(f"Error closing Redis connection: {e}")
+    
+    async def health_check(self) -> dict:
+        """Redis接続の健全性チェック"""
+        if not self.redis:
+            return {"status": "disconnected", "error": "No Redis connection"}
+        
+        try:
+            await asyncio.wait_for(self.redis.ping(), timeout=1)
+            return {"status": "connected", "latency": "healthy"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
     
     def _generate_cache_key(self, prefix: str, params: dict) -> str:
         """キャッシュキーを生成"""
@@ -49,12 +94,15 @@ class CacheService:
             return None
         
         try:
-            value = await self.redis.get(key)
+            value = await asyncio.wait_for(self.redis.get(key), timeout=2)
             if value:
                 return json.loads(value)
             return None
+        except asyncio.TimeoutError:
+            print(f"Cache get timeout for key: {key}")
+            return None
         except Exception as e:
-            print(f"Cache get error: {str(e)}")
+            print(f"Cache get error for key {key}: {str(e)}")
             return None
     
     async def set(
@@ -71,13 +119,22 @@ class CacheService:
             value_str = json.dumps(value, ensure_ascii=False)
             
             if ttl_seconds:
-                await self.redis.setex(key, ttl_seconds, value_str)
+                await asyncio.wait_for(
+                    self.redis.setex(key, ttl_seconds, value_str), 
+                    timeout=2
+                )
             else:
-                await self.redis.set(key, value_str)
+                await asyncio.wait_for(
+                    self.redis.set(key, value_str), 
+                    timeout=2
+                )
             
             return True
+        except asyncio.TimeoutError:
+            print(f"Cache set timeout for key: {key}")
+            return False
         except Exception as e:
-            print(f"Cache set error: {str(e)}")
+            print(f"Cache set error for key {key}: {str(e)}")
             return False
     
     async def delete(self, key: str) -> bool:
@@ -86,10 +143,13 @@ class CacheService:
             return False
         
         try:
-            await self.redis.delete(key)
+            await asyncio.wait_for(self.redis.delete(key), timeout=2)
             return True
+        except asyncio.TimeoutError:
+            print(f"Cache delete timeout for key: {key}")
+            return False
         except Exception as e:
-            print(f"Cache delete error: {str(e)}")
+            print(f"Cache delete error for key {key}: {str(e)}")
             return False
     
     async def get_station_research(

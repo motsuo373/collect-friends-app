@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "collect-friends-app",
-    "slug": "collect-friends-app",
+    "name": "kanzy",
+    "slug": "kanzy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -54,7 +54,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiDomain": "http://localhost:8000"
+      "apiDomain": "https://your-service-name-123456789-an.a.run.app",
+      "apiVersion": "v1",
+      "development": {
+        "apiDomain": "http://localhost:8000"
+      }
     }
   }
 }

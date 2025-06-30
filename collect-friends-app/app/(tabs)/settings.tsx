@@ -19,6 +19,7 @@ import { Icons } from '../../utils/iconHelper';
 import { LinearGradient } from 'expo-linear-gradient';
 import tw from 'twrnc';
 import Constants from 'expo-constants';
+import * as Location from 'expo-location';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -28,6 +29,51 @@ export default function Settings() {
   const [friendUid, setFriendUid] = useState('');
   const [addingFriend, setAddingFriend] = useState(false);
   const [requestingAIProposals, setRequestingAIProposals] = useState(false);
+
+  // 位置情報取得の許可を確認・取得
+  const getLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        if (Platform.OS === 'web') {
+          window.alert('位置情報の許可が必要です。ブラウザの設定で位置情報を許可してください。');
+        } else {
+          Alert.alert('許可が必要', '位置情報の許可が必要です。設定から位置情報を有効にしてください。');
+        }
+        return null;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      return {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+      };
+    } catch (error) {
+      console.error('位置情報取得エラー:', error);
+      if (Platform.OS === 'web') {
+        window.alert('位置情報の取得に失敗しました。');
+      } else {
+        Alert.alert('エラー', '位置情報の取得に失敗しました。');
+      }
+      return null;
+    }
+  };
+
+  // APIドメインの取得
+  const getApiDomain = () => {
+    const isDevelopment = __DEV__;
+    const config = Constants.expoConfig?.extra;
+    
+    if (isDevelopment && config?.development?.apiDomain) {
+      return config.development.apiDomain;
+    }
+    
+    return config?.apiDomain || 'http://localhost:8000';
+  };
 
   const handleLogout = async () => {
     // Web版とモバイル版で確認ダイアログを分岐
@@ -190,7 +236,7 @@ export default function Settings() {
     }
   };
 
-  // AI提案リクエスト機能
+  // AI提案リクエスト機能（改善版）
   const handleRequestAIProposals = async () => {
     if (!user?.uid) {
       Alert.alert('エラー', 'ユーザー情報が取得できません');
@@ -233,8 +279,7 @@ export default function Settings() {
   const performAIProposalRequest = async () => {
     setRequestingAIProposals(true);
     try {
-      // 環境変数からAPIドメインを取得
-      const apiDomain = Constants.expoConfig?.extra?.apiDomain || 'http://localhost:8000';
+      const apiDomain = getApiDomain();
       const apiUrl = `${apiDomain}/api/v1/generate-ai-proposals`;
       
       console.log('AI提案リクエストを開始します:', apiUrl);
@@ -246,41 +291,47 @@ export default function Settings() {
         },
         body: JSON.stringify({
           "target_user_ids": [user!.uid],
-          "max_proposals_per_user": 1,
+          "max_proposals_per_user": 2,
           "force_generation": true
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`HTTP ${response.status}: ${errorData.error_message || response.statusText}`);
       }
 
       const result = await response.json();
       console.log('AI提案リクエスト成功:', result);
       
       // 成功メッセージ
+      const successMessage = `AI提案のリクエストが完了しました！\n\n` +
+        `生成された提案: ${result.generated_proposals?.length || 0}件\n` +
+        `処理時間: ${result.processing_time_ms}ms\n\n` +
+        `しばらくしてから探索タブをご確認ください。`;
+      
       if (Platform.OS === 'web') {
-        window.alert('AI提案のリクエストが完了しました！\nしばらくしてから探索タブをご確認ください。');
+        window.alert(successMessage);
       } else {
-        Alert.alert(
-          '完了',
-          'AI提案のリクエストが完了しました！\nしばらくしてから探索タブをご確認ください。'
-        );
+        Alert.alert('完了', successMessage);
       }
       
     } catch (error) {
       console.error('AI提案リクエストエラー:', error);
       
       // エラーメッセージ
+      const errorMessage = `AI提案のリクエストに失敗しました。\n\nエラー詳細: ${(error as Error).message}`;
       if (Platform.OS === 'web') {
-        window.alert('AI提案のリクエストに失敗しました。もう一度お試しください。');
+        window.alert(errorMessage);
       } else {
-        Alert.alert('エラー', 'AI提案のリクエストに失敗しました。もう一度お試しください。');
+        Alert.alert('エラー', errorMessage);
       }
     } finally {
       setRequestingAIProposals(false);
     }
   };
+
+
 
   // 友達追加機能
   const handleAddFriend = async () => {
@@ -296,25 +347,57 @@ export default function Settings() {
 
     setAddingFriend(true);
     try {
-      // TODO: 実際の友達追加ロジックを実装
-      // 現在はモック実装
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('https://asia-northeast1-collect-friends-app.cloudfunctions.net/addFriend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentUserUid: user!.uid,
+          friendUid: friendUid.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Unknown error');
+      }
+
+      // 成功メッセージ
+      const message = `友達を追加しました！\n\n友達: ${result.friend.displayName}`;
       
-      Alert.alert(
-        '成功',
-        '友達を追加しました！',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setIsAddFriendModalVisible(false);
-              setFriendUid('');
-            },
-          },
-        ]
-      );
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert('成功', message);
+      }
+
+      setIsAddFriendModalVisible(false);
+      setFriendUid('');
+      
     } catch (error) {
-      Alert.alert('エラー', '友達の追加に失敗しました');
+      console.error('友達追加エラー:', error);
+      
+      let errorMessage = '友達の追加に失敗しました';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('User not found')) {
+          errorMessage = '指定されたユーザーIDが見つかりません';
+        } else if (error.message.includes('Already friends')) {
+          errorMessage = '既に友達になっています';
+        } else if (error.message.includes('Cannot add yourself')) {
+          errorMessage = '自分のIDは追加できません';
+        } else {
+          errorMessage = `エラー: ${error.message}`;
+        }
+      }
+      
+      if (Platform.OS === 'web') {
+        window.alert(errorMessage);
+      } else {
+        Alert.alert('エラー', errorMessage);
+      }
     } finally {
       setAddingFriend(false);
     }
@@ -425,8 +508,6 @@ export default function Settings() {
             </TouchableOpacity>
           </View>
 
-
-
           {/* 開発者向けセクション */}
           <View style={tw`mb-7`}>
             <Text style={tw`text-lg font-semibold text-gray-800 mb-4`}>開発者向け</Text>
@@ -462,6 +543,8 @@ export default function Settings() {
                 AIが活動提案を生成します
               </Text>
             </TouchableOpacity>
+
+
           </View>
 
           {/* ログアウトボタン */}
@@ -482,7 +565,7 @@ export default function Settings() {
 
           {/* アプリ情報 */}
           <View style={tw`items-center mt-7`}>
-            <Text style={tw`text-sm text-gray-500 mb-1`}>Collect Friends App</Text>
+            <Text style={tw`text-sm text-gray-500 mb-1`}>kanzy</Text>
             <Text style={tw`text-sm text-gray-500`}>Version 1.0.2</Text>
           </View>
         </ThemedView>

@@ -75,7 +75,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         <View style={styles.loginContainer}>
           {/* タイトルセクション */}
           <View style={styles.titleSection}>
-            <Text style={styles.title}>Kanjie</Text>
+            <Text style={styles.title}>Kanzy</Text>
             <Text style={styles.subtitle}>今すぐ遊べる友達を見つけよう！</Text>
           </View>
           

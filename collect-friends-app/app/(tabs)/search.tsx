@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProposalFilterModal from '@/components/ProposalFilterModal';
 import { Icons } from '@/utils/iconHelper';
 import { useProposals, UserProposalData } from '@/hooks/useProposals';
-import { updateProposalResponse } from '@/utils/firestoreService';
+import { updateProposalResponse, deleteProposalResponse, getProposalDetails } from '@/utils/firestoreService';
 import tw from 'twrnc';
 
 interface FilterOptions {
@@ -31,30 +31,49 @@ export default function ProposalsScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
-    setFilteredProposals(allProposals);
+    // statusが'pending'のもののみを表示
+    const pendingProposals = allProposals.filter(proposal => proposal.status === 'pending');
+    setFilteredProposals(pendingProposals);
   }, [allProposals]);
 
   // Firestoreからデータを取得する処理はuseProposals hookで実行されるため削除
 
-  const formatTime = (date: Date) => {
+  const formatTime = (createdAt: Date) => {
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const diff = now.getTime() - createdAt.getTime();
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
+    if (minutes < 1) return `今`;
     if (minutes < 60) return `${minutes}分前`;
     if (hours < 24) return `${hours}時間前`;
     return `${days}日前`;
   };
 
+  const formatExpiresAt = (expiresAt: Date) => {
+    const date = new Date(expiresAt);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    const weekday = weekdays[date.getDay()];
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    
+    return `${month}/${day}（${weekday}）${timeStr}〜`;
+  };
+
   const applyFilters = (newFilters: FilterOptions) => {
     setFilters(newFilters);
     
+    // まずstatusが'pending'のもののみフィルタリング
+    const pendingProposals = allProposals.filter(proposal => proposal.status === 'pending');
+    
     if (newFilters.activities.length === 0) {
-      setFilteredProposals(allProposals);
+      setFilteredProposals(pendingProposals);
     } else {
-      const filtered = allProposals.filter(proposal => 
+      const filtered = pendingProposals.filter(proposal => 
         proposal.category && newFilters.activities.includes(proposal.category)
       );
       setFilteredProposals(filtered);
@@ -85,17 +104,24 @@ export default function ProposalsScreen() {
   };
 
   // APIを呼び出してチャットルームを作成する関数
-  const callAcceptProposalAPI = async (proposalId: string, userId: string) => {
+  const callAcceptProposalAPI = async (proposalId: string, userId: string, chatId?: string) => {
     try {
+      const requestBody: any = {
+        proposalId: proposalId,
+        userId: userId
+      };
+
+      // chatIdがある場合は追加
+      if (chatId) {
+        requestBody.chatId = chatId;
+      }
+
       const response = await fetch('https://asia-northeast1-collect-friends-app.cloudfunctions.net/acceptProposal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          proposalId: proposalId,
-          userId: userId
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -106,6 +132,38 @@ export default function ProposalsScreen() {
       return result;
     } catch (error) {
       console.error('API call error:', error);
+      throw error;
+    }
+  };
+
+  // デバッグ用：提案データを確認する関数
+  const checkProposal = async (proposalId: string) => {
+    try {
+      const response = await fetch(`https://asia-northeast1-collect-friends-app.cloudfunctions.net/checkProposal?proposalId=${proposalId}`);
+      const result = await response.json();
+      console.log('Proposal check result:', result);
+      return result;
+    } catch (error) {
+      console.error('Check proposal error:', error);
+      throw error;
+    }
+  };
+
+  // デバッグ用：chatsListエントリをテスト作成する関数
+  const testChatsList = async (userId: string, chatId: string) => {
+    try {
+      const response = await fetch('https://asia-northeast1-collect-friends-app.cloudfunctions.net/testChatsList', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, chatId })
+      });
+      const result = await response.json();
+      console.log('Test chatsList result:', result);
+      return result;
+    } catch (error) {
+      console.error('Test chatsList error:', error);
       throw error;
     }
   };
@@ -124,21 +182,60 @@ export default function ProposalsScreen() {
             text: '参加する', 
             onPress: async () => {
               try {
-                // APIを呼び出してチャットルーム作成
-                const result = await callAcceptProposalAPI(proposal.proposalId, user.uid);
+                console.log('提案参加処理開始:', {
+                  proposalId: proposal.proposalId,
+                  userId: user.uid,
+                  title: proposal.title
+                });
+
+                // まず、proposalの詳細情報を取得してchatIdを確認
+                const proposalDetails = await getProposalDetails(proposal.proposalId);
+                console.log('提案詳細取得完了:', proposalDetails);
+                
+                let chatId = undefined;
+                
+                // proposalにchatIdが設定されている場合はそれを使用
+                if (proposalDetails?.chatId) {
+                  chatId = proposalDetails.chatId;
+                  console.log('既存のchatIdを使用:', chatId);
+                }
+                
+                // proposalにactiveChatIdが設定されている場合はそれを使用
+                if (proposalDetails?.activeChatId) {
+                  chatId = proposalDetails.activeChatId;
+                  console.log('activeChatIdを使用:', chatId);
+                }
+
+                // APIを呼び出してチャットルーム作成（statusの更新もCloud Functionsで行う）
+                console.log('acceptProposal API呼び出し開始...');
+                const result = await callAcceptProposalAPI(proposal.proposalId, user.uid, chatId);
+                console.log('API呼び出し結果:', result);
                 
                 if (result.success) {
                   Alert.alert(
                     '参加完了', 
-                    `提案に参加しました！\nチャット「${result.data.chatTitle}」が作成されました。`
+                    `提案に参加しました！\nチャット「${result.data?.chatTitle || 'チャット'}」が作成されました。`,
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          console.log('参加処理完了 - データ再取得');
+                          // データを再取得してリストを更新
+                          refetch();
+                        }
+                      }
+                    ]
                   );
-                  refetch(); // データを再取得
                 } else {
+                  console.error('API結果が失敗:', result);
                   throw new Error(result.message || 'API call failed');
                 }
               } catch (error) {
                 console.error('参加処理エラー:', error);
-                Alert.alert('エラー', '参加処理に失敗しました。もう一度お試しください。');
+                Alert.alert(
+                  'エラー', 
+                  `参加処理に失敗しました。\nエラー詳細: ${error instanceof Error ? error.message : '不明なエラー'}\n\nもう一度お試しください。`
+                );
               }
             }
           }
@@ -155,12 +252,32 @@ export default function ProposalsScreen() {
             style: 'destructive',
             onPress: async () => {
               try {
-                await updateProposalResponse(user.uid, proposal.proposalId, 'declined');
-                setFilteredProposals(prev => prev.filter(p => p.id !== proposalId));
-                Alert.alert('辞退完了', '提案を辞退しました。');
+                console.log('提案辞退処理開始:', {
+                  proposalId: proposal.proposalId,
+                  userId: user.uid,
+                  title: proposal.title
+                });
+
+                // statusを削除（辞退時は記録を削除）
+                await deleteProposalResponse(user.uid, proposal.proposalId);
+                console.log('提案削除完了');
+                
+                Alert.alert('辞退完了', '提案を辞退しました。', [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      console.log('辞退処理完了 - データ再取得');
+                      // データを再取得してリストを更新
+                      refetch();
+                    }
+                  }
+                ]);
               } catch (error) {
                 console.error('辞退処理エラー:', error);
-                Alert.alert('エラー', '辞退処理に失敗しました。もう一度お試しください。');
+                Alert.alert(
+                  'エラー', 
+                  `辞退処理に失敗しました。\nエラー詳細: ${error instanceof Error ? error.message : '不明なエラー'}\n\nもう一度お試しください。`
+                );
               }
             }
           }
@@ -219,7 +336,7 @@ export default function ProposalsScreen() {
             </Text>
           </View>
           <Text style={tw`text-xs text-gray-500`}>
-            {formatTime(item.scheduledAt || item.receivedAt)}
+            {formatTime(item.createdAt || item.receivedAt)}
           </Text>
         </View>
 
@@ -230,41 +347,75 @@ export default function ProposalsScreen() {
           </Text>
           
           {/* 参加者アイコン */}
-          <View style={tw`flex-row items-center mb-3`}>
-            <Ionicons name="people" size={16} color="#666" />
-            {(item.invitedUsers || []).map((user, index) => (
-              <View key={index} style={tw`flex-row items-center ml-1`}>
-                <View 
-                  style={[
-                    tw`w-6 h-6 rounded-full flex items-center justify-center`,
-                    { backgroundColor: user.displayName === 'あなた' ? '#00BCD4' : index === 1 ? '#F44336' : '#FFC107' }
-                  ]}
-                >
-                  <Text style={tw`text-white text-xs font-bold`}>
-                    {user.displayName === 'あなた' ? 'あ' : user.displayName?.charAt(0) || '?'}
-                  </Text>
-                </View>
-                <Text style={tw`text-sm text-gray-700 ml-1 mr-2`}>
-                  {user.displayName}
-                </Text>
-              </View>
-            ))}
+          <View style={tw`mb-3`}>
+            <View style={tw`flex-row items-center mb-2`}>
+              <Ionicons name="people" size={16} color="#666" />
+              <Text style={tw`text-sm text-gray-600 ml-2`}>
+                参加者 ({(item.participantUsers || []).length}人)
+              </Text>
+            </View>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={tw`flex-row items-center`}
+            >
+              {(item.participantUsers || []).map((user, index) => {
+                // participantUsersから displayName を取得
+                const displayName = user.displayName || '不明';
+                
+                // 各参加者に異なる色を割り当て
+                const colors = ['#00BCD4', '#F44336', '#FFC107', '#4CAF50', '#9C27B0', '#FF9800', '#795548', '#607D8B'];
+                const backgroundColor = displayName === 'あなた' ? '#00BCD4' : colors[index % colors.length];
+                
+                return (
+                  <View key={`${user.uid}-${index}`} style={tw`flex-row items-center mr-3`}>
+                    <View 
+                      style={[
+                        tw`w-8 h-8 rounded-full flex items-center justify-center`,
+                        { backgroundColor }
+                      ]}
+                    >
+                      <Text style={tw`text-white text-xs font-bold`}>
+                        {displayName === 'あなた' ? 'あ' : displayName.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                    <Text style={tw`text-sm text-gray-700 ml-2`}>
+                      {displayName}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* 日時 */}
           <View style={tw`flex-row items-center mb-2`}>
             <Ionicons name="time-outline" size={16} color="#666" />
             <Text style={tw`text-sm text-gray-600 ml-2`}>
-              6/29（日）18:00〜
+              {item.expiresAt ? formatExpiresAt(item.expiresAt) : '時間未設定'}
             </Text>
           </View>
 
           {/* 場所 */}
           <View style={tw`flex-row items-center mb-3`}>
             <Ionicons name="restaurant-outline" size={16} color="#666" />
-            <Text style={tw`text-sm text-gray-600 ml-2 flex-1`}>
-              {item.description}
-            </Text>
+            <View style={tw`flex-1 ml-2`}>
+              {item.location?.name && (
+                <Text style={tw`text-sm text-gray-800 font-medium`}>
+                  {item.location.name}
+                </Text>
+              )}
+              {item.location?.address && (
+                <Text style={tw`text-xs text-gray-600`}>
+                  {item.location.address}
+                </Text>
+              )}
+              {!item.location?.name && !item.location?.address && (
+                <Text style={tw`text-sm text-gray-600`}>
+                  場所未設定
+                </Text>
+              )}
+            </View>
             <TouchableOpacity>
               <Text style={[tw`text-sm font-medium`, { color: '#FF8700' }]}>
                 詳細

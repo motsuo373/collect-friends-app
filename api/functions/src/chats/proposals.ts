@@ -1,6 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { Request, Response } from 'express';
 
 const db = getFirestore();
@@ -8,6 +8,7 @@ const db = getFirestore();
 interface AcceptProposalRequest {
   proposalId: string;
   userId: string;
+  chatId?: string; // 既存のチャットルームがある場合はそのIDを指定
 }
 
 /**
@@ -34,7 +35,7 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
       return;
     }
 
-    const { proposalId, userId }: AcceptProposalRequest = request.body;
+    const { proposalId, userId, chatId }: AcceptProposalRequest = request.body;
 
     // バリデーション
     if (!proposalId || !userId) {
@@ -45,7 +46,7 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
       return;
     }
 
-    logger.info('Accepting proposal', { proposalId, userId });
+    logger.info('Accepting proposal', { proposalId, userId, chatId });
 
     // 1. 提案データの取得
     const proposalRef = db.collection('proposals').doc(proposalId);
@@ -87,72 +88,82 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
       updatedAt: new Date()
     });
 
-    // 4. 新しいチャットルームを作成
-    const chatId = `chat_${proposalId}_${Date.now()}`;
+    // 4. チャットルームの設定（既存のチャットまたは新規作成）
+    const finalChatId = chatId || `chat_${proposalId}_${Date.now()}`;
     const chatTitle = proposalData.title || 'グループチャット';
     
     // 参加者リストの正しい取得（配列の確認）
     let participants: string[] = [];
-    if (Array.isArray(proposalData.targetUsers)) {
-      participants = proposalData.targetUsers;
-    } else if (Array.isArray(proposalData.invitedUsers)) {
-      participants = proposalData.invitedUsers.map((user: any) => user.uid || user.id);
+    if (Array.isArray(proposalData.target_users)) {
+      participants = proposalData.target_users;
+    } else if (Array.isArray(proposalData.invited_users)) {
+      participants = proposalData.invited_users.map((user: any) => user.uid || user.id);
     } else {
       logger.warn('No valid participants found in proposal data', { proposalData });
       participants = [userId]; // 最低限承認者を追加
     }
 
     // participantDisplayNamesの生成
-    const invitedUsers = proposalData.invitedUsers || [];
-    const participantDisplayNames = invitedUsers.map((user: any) => user.displayName || '不明なユーザー');
+    const invitedUsers = proposalData.invited_users || [];
+    const participantDisplayNames = invitedUsers.map((user: any) => user.display_name || '不明なユーザー');
     
-    logger.info('Participants determined', { participants, participantDisplayNames });
+    logger.info('Participants determined', { participants, participantDisplayNames, finalChatId, isExistingChat: !!chatId });
 
-    // チャットドキュメントの作成
-    const chatData = {
-      chatId: chatId,
-      type: 'ai_proposal',
-      participants: participants,
-      eventRef: null, // イベントが確定したらここに参照を追加
-      aiAssistEnabled: true,
-      lastMessage: {
+    // 新しいチャットルームの場合のみ作成処理を実行
+    if (!chatId) {
+      // チャットドキュメントの作成
+      const chatData = {
+        chatId: finalChatId,
+        type: 'ai_proposal',
+        participants: participants,
+        eventRef: null, // イベントが確定したらここに参照を追加
+        aiAssistEnabled: true,
+        lastMessage: {
+          messageId: `welcome_${Date.now()}`,
+          senderUid: 'system',
+          senderDisplayName: 'システム',
+          content: `${chatTitle}のチャットが作成されました！`,
+          type: 'system',
+          timestamp: new Date()
+        },
+        activeUsers: [userId],
+        typingUsers: {},
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const chatRef = db.collection('chats').doc(finalChatId);
+      await chatRef.set(chatData);
+
+      // 5. システムメッセージをチャットに追加
+      const welcomeMessageData = {
         messageId: `welcome_${Date.now()}`,
-        senderUid: 'system',
-        senderDisplayName: 'システム',
-        content: `${chatTitle}のチャットが作成されました！`,
+        senderRef: null, // システムメッセージなので参照なし
+        content: `${chatTitle}のチャットが作成されました！みんなで楽しく計画を立てましょう🎉`,
         type: 'system',
-        timestamp: new Date()
-      },
-      activeUsers: [userId],
-      typingUsers: {},
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+        mediaUrl: null,
+        aiGenerated: false,
+        reactions: [],
+        timestamp: new Date(),
+        editedAt: null,
+        isRead: {}
+      };
 
-    const chatRef = db.collection('chats').doc(chatId);
-    await chatRef.set(chatData);
-
-    // 5. システムメッセージをチャットに追加
-    const welcomeMessageData = {
-      messageId: `welcome_${Date.now()}`,
-      senderRef: null, // システムメッセージなので参照なし
-      content: `${chatTitle}のチャットが作成されました！みんなで楽しく計画を立てましょう🎉`,
-      type: 'system',
-      mediaUrl: null,
-      aiGenerated: false,
-      reactions: [],
-      timestamp: new Date(),
-      editedAt: null,
-      isRead: {}
-    };
-
-    await chatRef.collection('messages').add(welcomeMessageData);
+      await chatRef.collection('messages').add(welcomeMessageData);
+    } else {
+      // 既存のチャットルームの場合は参加者をアクティブユーザーに追加
+      const existingChatRef = db.collection('chats').doc(finalChatId);
+      await existingChatRef.update({
+        activeUsers: FieldValue.arrayUnion(userId),
+        updatedAt: new Date()
+      });
+    }
 
     // 6. 参加者全員のchatsListに追加
     logger.info('Adding chatsList entries for participants', { 
       participants, 
       participantsCount: participants.length,
-      chatId,
+      chatId: finalChatId,
       proposalDataKeys: Object.keys(proposalData)
     });
     
@@ -160,8 +171,8 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
       logger.error('No participants found for chatsList creation', { 
         proposalId, 
         participants,
-        targetUsers: proposalData.targetUsers,
-        invitedUsers: proposalData.invitedUsers,
+        targetUsers: proposalData.target_users,
+        invitedUsers: proposalData.invited_users,
         proposalDataSnapshot: JSON.stringify(proposalData, null, 2)
       });
       // 空の場合でも承認者だけは追加
@@ -173,10 +184,10 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
       try {
         logger.info(`Creating chatsList entry for participant: ${participantUid}`);
         
-        const chatsListRef = db.collection('users').doc(participantUid).collection('chatsList').doc(chatId);
+        const chatsListRef = db.collection('users').doc(participantUid).collection('chatsList').doc(finalChatId);
         const chatsListData = {
-          chatId: chatId,
-          chatRefPath: `chats/${chatId}`, // 参照パスを文字列として保存
+          chatId: finalChatId,
+          chatRefPath: `chats/${finalChatId}`, // 参照パスを文字列として保存
           chatType: 'ai_proposal',
           title: chatTitle,
           lastMessage: {
@@ -198,7 +209,7 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
           relatedEventId: null,
           joinedAt: new Date(),
           leftAt: null,
-          role: participantUid === (proposalData.creatorRef?.id || proposalData.targetUsers?.[0]) ? 'admin' : 'member',
+          role: participantUid === (proposalData.creator_ref?.id || proposalData.target_users?.[0]) ? 'admin' : 'member',
           customSettings: {
             notificationLevel: 'all',
             theme: 'default',
@@ -212,7 +223,7 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
 
         await chatsListRef.set(chatsListData);
         logger.info(`Successfully created chatsList entry for participant: ${participantUid}`, {
-          chatsListPath: `users/${participantUid}/chatsList/${chatId}`,
+          chatsListPath: `users/${participantUid}/chatsList/${finalChatId}`,
           dataKeys: Object.keys(chatsListData)
         });
         return { participantUid, success: true };
@@ -221,9 +232,9 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
         logger.error(`Failed to create chatsList entry for participant: ${participantUid}`, {
           error: error instanceof Error ? error.message : 'Unknown error',
           errorStack: error instanceof Error ? error.stack : 'No stack trace',
-          chatsListPath: `users/${participantUid}/chatsList/${chatId}`,
+          chatsListPath: `users/${participantUid}/chatsList/${finalChatId}`,
           participantUid,
-          chatId
+          chatId: finalChatId
         });
         return { participantUid, success: false, error: error instanceof Error ? error.message : 'Unknown error' };
       }
@@ -252,7 +263,7 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
     logger.info('Proposal accepted and chat created successfully', { 
       proposalId, 
       userId, 
-      chatId,
+      chatId: finalChatId,
       participantsCount: participants.length 
     });
 
@@ -262,7 +273,7 @@ export const acceptProposal = onRequest(async (request: Request, response: Respo
       message: 'Proposal accepted and chat created successfully',
       data: {
         proposalId: proposalId,
-        chatId: chatId,
+        chatId: finalChatId,
         chatTitle: chatTitle,
         participantsCount: participants.length,
         timestamp: new Date().toISOString()

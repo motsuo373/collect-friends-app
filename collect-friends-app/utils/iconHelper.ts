@@ -47,6 +47,8 @@ export const Icons = (() => {
     Copy: iconLib.Copy,
     UserPlus: iconLib.UserPlus,
     Search: iconLib.Search,
+    ArrowLeft: iconLib.ArrowLeft,
+    ChevronLeft: iconLib.ChevronLeft,
     
     // アクティビティアイコン
     Coffee: iconLib.Coffee,

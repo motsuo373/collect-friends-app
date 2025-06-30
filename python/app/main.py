@@ -67,12 +67,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     """ヘルスチェック"""
-    redis_status = "connected" if cache_service.redis else "disconnected"
+    redis_health = await cache_service.health_check()
     
     return {
         "status": "healthy",
-        "redis": redis_status,
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "redis": redis_health,
+        "message": "Application is running"
     }
 
 

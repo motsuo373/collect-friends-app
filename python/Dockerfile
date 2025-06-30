@@ -17,11 +17,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 
 # Cloud Run用の環境変数設定（デフォルト値）
-ENV PORT=8080
 ENV HOST=0.0.0.0
 
-# ポート公開
-EXPOSE $PORT
+# ポート公開（Cloud Runが自動的にPORTを設定）
+EXPOSE 8080
 
 # ヘルスチェック（Cloud Run用に調整）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

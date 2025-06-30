@@ -4,14 +4,13 @@ import {
   query, 
   orderBy, 
   onSnapshot, 
-  addDoc, 
-  serverTimestamp,
   doc,
   getDoc,
   Timestamp
 } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendChatMessage } from '@/utils/firestoreService';
 
 export interface ChatMessage {
   id: string;
@@ -109,15 +108,11 @@ export const useChat = (chatRoomId: string) => {
       const messageData = {
         content: content.trim(),
         senderRef: user.uid,
-        timestamp: serverTimestamp(),
         type: 'text',
-        aiGenerated: false,
-        isRead: {
-          [user.uid]: serverTimestamp()
-        }
+        aiGenerated: false
       };
 
-      await addDoc(collection(db, 'chats', chatRoomId, 'messages'), messageData);
+      await sendChatMessage(chatRoomId, messageData);
     } catch (error) {
       console.error('メッセージ送信エラー:', error);
       throw new Error('メッセージの送信に失敗しました。');
@@ -134,13 +129,11 @@ export const useChat = (chatRoomId: string) => {
       const messageData = {
         content: content.trim(),
         senderRef: 'ai_system',
-        timestamp: serverTimestamp(),
         type: 'ai_message',
-        aiGenerated: true,
-        isRead: {}
+        aiGenerated: true
       };
 
-      await addDoc(collection(db, 'chats', chatRoomId, 'messages'), messageData);
+      await sendChatMessage(chatRoomId, messageData);
     } catch (error) {
       console.error('AIメッセージ送信エラー:', error);
       throw new Error('AIメッセージの送信に失敗しました。');

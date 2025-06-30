@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, storage } from '../../firebaseConfig';
-import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db } from '../../firebaseConfig';
+// import * as ImagePicker from 'expo-image-picker';
+// import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { router, useNavigation } from 'expo-router';
+import { Icons } from '../../utils/iconHelper';
 
-export default function ProfileSettingsScreen({ navigation }: any) {
+export default function ProfileSettingsScreen() {
   const { user } = useAuth();
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -28,6 +31,22 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   useEffect(() => {
     loadUserData();
   }, []);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity 
+          onPress={handleSave} 
+          disabled={saving}
+          style={styles.headerButton}
+        >
+          <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
+            {saving ? '保存中...' : '保存'}
+          </Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, saving]);
 
   const loadUserData = async () => {
     if (!user) return;
@@ -50,57 +69,66 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   };
 
   const handleImagePicker = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    // 画像アップロード機能は一時的に無効化
+    Alert.alert('お知らせ', '画像アップロード機能は現在準備中です');
     
-    if (status !== 'granted') {
-      Alert.alert('権限エラー', '写真へのアクセス権限が必要です');
-      return;
-    }
+    // const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    // 
+    // if (status !== 'granted') {
+    //   Alert.alert('権限エラー', '写真へのアクセス権限が必要です');
+    //   return;
+    // }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+    // const result = await ImagePicker.launchImageLibraryAsync({
+    //   mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    //   allowsEditing: true,
+    //   aspect: [1, 1],
+    //   quality: 0.8,
+    // });
 
-    if (!result.canceled && result.assets[0]) {
-      uploadImage(result.assets[0].uri);
-    }
+    // if (!result.canceled && result.assets[0]) {
+    //   uploadImage(result.assets[0].uri);
+    // }
   };
 
   const uploadImage = async (uri: string) => {
-    setSaving(true);
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      const storageRef = ref(storage, `profileImages/${user?.uid}/${Date.now()}.jpg`);
-      const uploadTask = uploadBytesResumable(storageRef, blob);
+    // 画像アップロード機能は一時的に無効化
+    console.log('画像アップロード機能は準備中です:', uri);
+    
+    // setSaving(true);
+    // try {
+    //   const response = await fetch(uri);
+    //   const blob = await response.blob();
+    //   
+    //   const storageRef = ref(storage, `profileImages/${user?.uid}/${Date.now()}.jpg`);
+    //   const uploadTask = uploadBytesResumable(storageRef, blob);
 
-      uploadTask.on(
-        'state_changed',
-        null,
-        (error) => {
-          console.error('アップロードエラー:', error);
-          Alert.alert('エラー', '画像のアップロードに失敗しました');
-          setSaving(false);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          setProfileImage(downloadURL);
-          setSaving(false);
-        }
-      );
-    } catch (error) {
-      console.error('画像処理エラー:', error);
-      Alert.alert('エラー', '画像の処理に失敗しました');
-      setSaving(false);
-    }
+    //   uploadTask.on(
+    //     'state_changed',
+    //     null,
+    //     (error: any) => {
+    //       console.error('アップロードエラー:', error);
+    //       Alert.alert('エラー', '画像のアップロードに失敗しました');
+    //       setSaving(false);
+    //     },
+    //     async () => {
+    //       const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+    //       setProfileImage(downloadURL);
+    //       setSaving(false);
+    //     }
+    //   );
+    // } catch (error) {
+    //   console.error('画像処理エラー:', error);
+    //   Alert.alert('エラー', '画像の処理に失敗しました');
+    //   setSaving(false);
+    // }
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user) {
+      console.error('ユーザーが見つかりません');
+      return;
+    }
     
     if (!displayName.trim()) {
       Alert.alert('エラー', '表示名を入力してください');
@@ -109,6 +137,13 @@ export default function ProfileSettingsScreen({ navigation }: any) {
 
     setSaving(true);
     try {
+      console.log('プロフィール保存開始:', {
+        uid: user.uid,
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+        profileImage,
+      });
+
       await updateDoc(doc(db, 'users', user.uid), {
         displayName: displayName.trim(),
         bio: bio.trim(),
@@ -116,11 +151,12 @@ export default function ProfileSettingsScreen({ navigation }: any) {
         updatedAt: new Date(),
       });
 
+      console.log('プロフィール保存成功');
       Alert.alert('成功', 'プロフィールを更新しました');
-      navigation.goBack();
+      router.back();
     } catch (error) {
       console.error('保存エラー:', error);
-      Alert.alert('エラー', 'プロフィールの保存に失敗しました');
+      Alert.alert('エラー', `プロフィールの保存に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -139,18 +175,6 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>戻る</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>プロフィール編集</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            <Text style={[styles.saveButton, saving && styles.saveButtonDisabled]}>
-              {saving ? '保存中...' : '保存'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.content}>
           <View style={styles.imageSection}>
             <TouchableOpacity onPress={handleImagePicker} disabled={saving}>
@@ -236,6 +260,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#007AFF',
   },
+  backButtonContainer: {
+    padding: 4,
+    borderRadius: 8,
+  },
   title: {
     fontSize: 18,
     fontWeight: '600',
@@ -248,6 +276,10 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: {
     color: '#ccc',
+  },
+  headerButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   content: {
     padding: 16,
